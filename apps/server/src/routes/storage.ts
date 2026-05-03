@@ -1,8 +1,14 @@
-import { Router, type Router as ExpressRouter } from 'express';
+import { Router, type Router as ExpressRouter, Request, Response } from 'express';
 import { localDB } from '../localDB';
 import { Schemas, validateBody, validateQuery } from '../schemas';
 
 const router: ExpressRouter = Router();
+
+// Middleware to get userId from header
+const getUserId = (req: Request) => {
+  const userId = req.headers['x-user-id'] as string;
+  return userId || 'anonymous'; // Fallback to anonymous for unauthenticated or local usage
+};
 
 // Health
 router.get('/health', (_req, res) => {
@@ -12,10 +18,11 @@ router.get('/health', (_req, res) => {
 // --- Storage API ---
 
 // Batch Migration
-router.post('/storage/migrate', validateBody(Schemas.migrateBatch), (req, res) => {
+router.post('/storage/migrate', validateBody(Schemas.migrateBatch), async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { tracks, history, favorites } = req.body;
-    localDB.bulkSave(tracks, history, favorites);
+    await localDB.bulkSave(userId, tracks, history, favorites);
     res.sendStatus(200);
   } catch (err: any) {
     console.error('Storage POST /migrate error:', err.message);
@@ -24,18 +31,19 @@ router.post('/storage/migrate', validateBody(Schemas.migrateBatch), (req, res) =
 });
 
 // Tracks
-router.get('/storage/tracks/:id', (req, res) => {
+router.get('/storage/tracks/:id', async (req, res) => {
   try {
-    res.json(localDB.getTrack(req.params.id));
+    const track = await localDB.getTrack(req.params.id);
+    res.json(track);
   } catch (err: any) {
     console.error('Storage GET /tracks/:id error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/storage/tracks', validateBody(Schemas.saveTrack), (req, res) => {
+router.post('/storage/tracks', validateBody(Schemas.saveTrack), async (req, res) => {
   try {
-    localDB.saveTrack(req.body);
+    await localDB.saveTrack(req.body);
     res.sendStatus(200);
   } catch (err: any) {
     console.error('Storage POST /tracks error:', err.message);
@@ -43,19 +51,21 @@ router.post('/storage/tracks', validateBody(Schemas.saveTrack), (req, res) => {
   }
 });
 
-router.get('/storage/tags', (_req, res) => {
+router.get('/storage/tags', async (_req, res) => {
   try {
-    res.json(localDB.getAllTags());
+    const tags = await localDB.getAllTags();
+    res.json(tags);
   } catch (err: any) {
     console.error('Storage GET /tags error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-router.get('/storage/tracks-by-tag', validateQuery(Schemas.tracksByTagQuery), (req, res) => {
+router.get('/storage/tracks-by-tag', validateQuery(Schemas.tracksByTagQuery), async (req, res) => {
   try {
     const tag = req.query.tag as string;
-    res.json(localDB.getTracksByTag(tag));
+    const tracks = await localDB.getTracksByTag(tag);
+    res.json(tracks);
   } catch (err: any) {
     console.error('Storage GET /tracks-by-tag error:', err.message);
     res.status(500).json({ error: err.message });
@@ -63,18 +73,21 @@ router.get('/storage/tracks-by-tag', validateQuery(Schemas.tracksByTagQuery), (r
 });
 
 // Favorites
-router.get('/storage/favorites', (_req, res) => {
+router.get('/storage/favorites', async (req, res) => {
   try {
-    res.json(localDB.getFavoriteGroups());
+    const userId = getUserId(req);
+    const favorites = await localDB.getFavoriteGroups(userId);
+    res.json(favorites);
   } catch (err: any) {
     console.error('Storage GET /favorites error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/storage/favorites', validateBody(Schemas.saveFavoriteGroup), (req, res) => {
+router.post('/storage/favorites', validateBody(Schemas.saveFavoriteGroup), async (req, res) => {
   try {
-    localDB.saveFavoriteGroup(req.body);
+    const userId = getUserId(req);
+    await localDB.saveFavoriteGroup(userId, req.body);
     res.sendStatus(200);
   } catch (err: any) {
     console.error('Storage POST /favorites error:', err.message);
@@ -82,9 +95,9 @@ router.post('/storage/favorites', validateBody(Schemas.saveFavoriteGroup), (req,
   }
 });
 
-router.delete('/storage/favorites/:id', (req, res) => {
+router.delete('/storage/favorites/:id', async (req, res) => {
   try {
-    localDB.deleteFavoriteGroup(req.params.id);
+    await localDB.deleteFavoriteGroup(req.params.id);
     res.sendStatus(200);
   } catch (err: any) {
     console.error('Storage DELETE /favorites/:id error:', err.message);
@@ -93,20 +106,23 @@ router.delete('/storage/favorites/:id', (req, res) => {
 });
 
 // History
-router.get('/storage/history', validateQuery(Schemas.historyQuery), (req, res) => {
+router.get('/storage/history', validateQuery(Schemas.historyQuery), async (req, res) => {
   try {
-    const limit = req.query.limit as unknown as number;
-    res.json(localDB.getHistory(limit));
+    const userId = getUserId(req);
+    const limit = parseInt(req.query.limit as string) || 200;
+    const history = await localDB.getHistory(userId, limit);
+    res.json(history);
   } catch (err: any) {
     console.error('Storage GET /history error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/storage/history', validateBody(Schemas.addHistory), (req, res) => {
+router.post('/storage/history', validateBody(Schemas.addHistory), async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { trackId, track } = req.body;
-    localDB.addHistory(trackId, track);
+    await localDB.addHistory(userId, trackId, track);
     res.sendStatus(200);
   } catch (err: any) {
     console.error('Storage POST /history error:', err.message);
@@ -114,9 +130,10 @@ router.post('/storage/history', validateBody(Schemas.addHistory), (req, res) => 
   }
 });
 
-router.delete('/storage/history/:trackId', (req, res) => {
+router.delete('/storage/history/:trackId', async (req, res) => {
   try {
-    localDB.removeFromHistory(req.params.trackId);
+    const userId = getUserId(req);
+    await localDB.removeFromHistory(userId, req.params.trackId);
     res.sendStatus(200);
   } catch (err: any) {
     console.error('Storage DELETE /history/:trackId error:', err.message);
@@ -124,19 +141,23 @@ router.delete('/storage/history/:trackId', (req, res) => {
   }
 });
 
-router.get('/storage/recommendations', (_req, res) => {
+router.get('/storage/recommendations', async (req, res) => {
   try {
-    res.json(localDB.getRecommendations());
+    const userId = getUserId(req);
+    const recs = await localDB.getRecommendations(userId);
+    res.json(recs);
   } catch (err: any) {
     console.error('Storage GET /recommendations error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-router.get('/storage/recent', validateQuery(Schemas.recentQuery), (req, res) => {
+router.get('/storage/recent', validateQuery(Schemas.recentQuery), async (req, res) => {
   try {
-    const limit = req.query.limit as unknown as number;
-    res.json(localDB.getRecentTracks(limit));
+    const userId = getUserId(req);
+    const limit = parseInt(req.query.limit as string) || 30;
+    const tracks = await localDB.getRecentTracks(userId, limit);
+    res.json(tracks);
   } catch (err: any) {
     console.error('Storage GET /recent error:', err.message);
     res.status(500).json({ error: err.message });

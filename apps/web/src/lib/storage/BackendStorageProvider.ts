@@ -2,6 +2,22 @@ import { Storage, Track, FavoriteGroup, PlayHistory } from '@music-player/shared
 import { API_BASE_URL } from '../api';
 
 export class BackendStorageProvider implements Storage {
+  private userId: string | null = null;
+
+  setUserId(userId: string | null) {
+    this.userId = userId;
+  }
+
+  private getHeaders() {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.userId) {
+      headers['x-user-id'] = this.userId;
+    }
+    return headers;
+  }
+
   async init(): Promise<void> {
     return Promise.resolve();
   }
@@ -11,7 +27,7 @@ export class BackendStorageProvider implements Storage {
     try {
       await fetch(`${API_BASE_URL}/storage/tracks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify(track)
       });
     } catch (e) {
@@ -21,7 +37,9 @@ export class BackendStorageProvider implements Storage {
 
   async getTrack(id: string): Promise<Track | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/tracks/${id}`);
+      const res = await fetch(`${API_BASE_URL}/storage/tracks/${id}`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -44,7 +62,9 @@ export class BackendStorageProvider implements Storage {
 
   async getAllTags(): Promise<string[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/tags`);
+      const res = await fetch(`${API_BASE_URL}/storage/tags`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -55,7 +75,9 @@ export class BackendStorageProvider implements Storage {
 
   async getTracksByTag(tag: string): Promise<Track[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/tracks-by-tag?tag=${encodeURIComponent(tag)}`);
+      const res = await fetch(`${API_BASE_URL}/storage/tracks-by-tag?tag=${encodeURIComponent(tag)}`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -67,7 +89,9 @@ export class BackendStorageProvider implements Storage {
   // Favorites
   async getFavoriteGroups(): Promise<FavoriteGroup[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/favorites`);
+      const res = await fetch(`${API_BASE_URL}/storage/favorites`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -80,7 +104,7 @@ export class BackendStorageProvider implements Storage {
     try {
       await fetch(`${API_BASE_URL}/storage/favorites`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify(group)
       });
     } catch (e) {
@@ -91,7 +115,8 @@ export class BackendStorageProvider implements Storage {
   async deleteFavoriteGroup(id: string): Promise<void> {
     try {
       await fetch(`${API_BASE_URL}/storage/favorites/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: this.getHeaders()
       });
     } catch (e) {
       console.error('[StorageProvider] deleteFavoriteGroup failed:', e);
@@ -114,7 +139,9 @@ export class BackendStorageProvider implements Storage {
   // History
   async getHistory(limit: number = 200): Promise<PlayHistory[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/history?limit=${limit}`);
+      const res = await fetch(`${API_BASE_URL}/storage/history?limit=${limit}`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -127,7 +154,7 @@ export class BackendStorageProvider implements Storage {
     try {
       await fetch(`${API_BASE_URL}/storage/history`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify({ trackId, track })
       });
     } catch (e) {
@@ -138,7 +165,8 @@ export class BackendStorageProvider implements Storage {
   async removeFromHistory(trackId: string): Promise<void> {
     try {
       await fetch(`${API_BASE_URL}/storage/history/${trackId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: this.getHeaders()
       });
     } catch (e) {
       console.error('[StorageProvider] removeFromHistory failed:', e);
@@ -160,7 +188,9 @@ export class BackendStorageProvider implements Storage {
 
   async getRecommendations(): Promise<Track[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/recommendations`);
+      const res = await fetch(`${API_BASE_URL}/storage/recommendations`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -173,7 +203,7 @@ export class BackendStorageProvider implements Storage {
     try {
       await fetch(`${API_BASE_URL}/storage/migrate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify({ tracks, history, favorites })
       });
     } catch (e) {
@@ -183,7 +213,9 @@ export class BackendStorageProvider implements Storage {
 
   async getRecentTracks(limit: number = 30): Promise<Track[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/recent?limit=${limit}`);
+      const res = await fetch(`${API_BASE_URL}/storage/recent?limit=${limit}`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {

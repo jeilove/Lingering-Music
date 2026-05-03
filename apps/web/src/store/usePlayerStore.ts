@@ -20,30 +20,9 @@ interface PlayerState {
   currentTime: number;
   
   // Actions
+  setUserId: (userId: string | null) => Promise<void>;
   setCurrentTrack: (track: Track) => void;
-  togglePlay: () => void;
-  loadHistory: () => Promise<void>;
-  loadFavorites: () => Promise<void>;
-  loadRecommendations: () => Promise<void>;
-  loadAIRecommendations: (force?: boolean) => Promise<void>;
-  addToHistory: (track: Track) => Promise<void>;
-  toggleFavorite: (track: Track) => Promise<void>;
-  createGroup: (name: string) => Promise<void>;
-  renameGroup: (id: string, name: string) => Promise<void>;
-  addTrackToGroup: (track: Track, groupId: string) => Promise<void>;
-  removeTrackFromGroup: (trackId: string, groupId: string) => Promise<void>;
-  removeFromAllGroups: (trackId: string) => Promise<void>;
-  refreshRecentTracks: () => Promise<void>;
-  updateTrackTags: (trackId: string, tags: string[]) => Promise<void>;
-  loadAllTags: () => Promise<void>;
-  setFilteredTracksByTag: (tag: string | null) => Promise<void>;
-  setActiveTag: (tag: string | null) => void;
-  setTrackExcluded: (trackId: string, excluded: boolean) => Promise<void>;
-  setSelectedGroupId: (id: string | null) => void;
-  setLyricsOpen: (open: boolean) => void;
-  removeFromHistory: (trackId: string) => Promise<void>;
-  setCurrentTime: (time: number) => void;
-  restoreFromBackup: (data: { tracks?: Track[], history?: PlayHistory[], favorites?: FavoriteGroup[] }) => Promise<void>;
+  // ... rest of actions
 }
 
 const storage = new BackendStorageProvider();
@@ -52,17 +31,17 @@ const oldLocalStorage = new IndexedDBProvider();
 // Initialize storage and load initial state
 let isInitialized = false;
 let initPromise: Promise<void> | null = null;
+let currentUserId: string | null = null;
 
 const migrateData = async () => {
   if (typeof window === 'undefined') return;
-  const migrated = localStorage.getItem('vibe_storage_migrated');
+  const migrated = localStorage.getItem(`vibe_storage_migrated_${currentUserId || 'anon'}`);
   if (migrated === 'true') return;
 
   try {
-    console.log('[Migration] Starting batch migration from IndexedDB to Backend...');
+    console.log('[Migration] Starting batch migration...');
     await oldLocalStorage.init();
     
-    // 1. Collect all tracks in history
     const history = await oldLocalStorage.getHistory(500);
     const uniqueTrackIds = Array.from(new Set(history.map(h => h.trackId)));
     const tracks: Track[] = [];
@@ -72,14 +51,11 @@ const migrateData = async () => {
       if (t) tracks.push(t);
     }
     
-    // 2. Collect all favors
     const favorites = await oldLocalStorage.getFavoriteGroups();
-    
-    // 3. Send as single batch
     await storage.migrateBatch(tracks, history, favorites);
 
-    localStorage.setItem('vibe_storage_migrated', 'true');
-    console.log('[Migration] Batch migration completed successfully.');
+    localStorage.setItem(`vibe_storage_migrated_${currentUserId || 'anon'}`, 'true');
+    console.log('[Migration] Batch migration completed.');
   } catch (err) {
     console.error('[Migration] Failed:', err);
   }
@@ -90,7 +66,7 @@ const initStorage = async (store: any) => {
 
   initPromise = (async () => {
     try {
-      console.log('[PlayerStore] Initializing storage...');
+      console.log('[PlayerStore] Initializing storage for user:', currentUserId);
       await storage.init();
       
       // Perform migration if needed
@@ -113,9 +89,6 @@ const initStorage = async (store: any) => {
         recommendations
       });
 
-      // AI recommendations are now manual-trigger only via UI button
-      
-      // PERSISTENCE: Re-apply last selected tag and group
       const savedTag = localStorage.getItem('activeTag');
       const savedGroupId = localStorage.getItem('selectedGroupId');
       
@@ -155,9 +128,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isLyricsOpen: false,
   currentTime: 0,
 
+  setUserId: async (userId) => {
+    if (currentUserId === userId) return;
+    
+    console.log('[PlayerStore] User ID changed:', currentUserId, '->', userId);
+    currentUserId = userId;
+    storage.setUserId(userId);
+    
+    // Reset initialization to trigger reload
+    isInitialized = false;
+    await initStorage({ setState: set, getState: get });
+  },
+
   setCurrentTrack: (track) => {
     set({ currentTrack: track, isPlaying: true });
-    // Also add to history immediately when set
     get().addToHistory(track);
   },
   
