@@ -44,7 +44,7 @@ interface PlayerState {
   setLyricsOpen: (open: boolean) => void;
   removeFromHistory: (trackId: string) => Promise<void>;
   setCurrentTime: (time: number) => void;
-  restoreFromBackup: (data: { tracks?: Track[], history?: PlayHistory[], favorites?: FavoriteGroup[] }) => Promise<void>;
+  restoreFromBackup: (data: any) => Promise<void>;
 }
 
 const storage = new BackendStorageProvider();
