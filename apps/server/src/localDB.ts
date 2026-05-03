@@ -99,25 +99,23 @@ class NeonDB {
 
   async saveFavoriteGroup(userId: string, group: FavoriteGroup) {
     try {
-      // 1. Upsert the group - CRITICAL: Update userId to ensure ownership if migrating from anonymous
-      const dbGroup = await prisma.favoriteGroup.upsert({
-        where: { id: group.id },
-        update: { 
-          name: group.name,
-          userId: userId // Take ownership
-        },
-        create: { 
+      // Delete existing group and its favorites (regardless of previous owner)
+      // This ensures clean ownership transfer during migration
+      await prisma.favorite.deleteMany({ where: { groupId: group.id } });
+      await prisma.favoriteGroup.deleteMany({ where: { id: group.id } });
+
+      // Re-create with correct userId
+      const dbGroup = await prisma.favoriteGroup.create({
+        data: {
           id: group.id,
           name: group.name,
           userId: userId
         }
       });
 
-      // 2. Sync tracks (Delete and Re-add for simplicity in this version)
-      await prisma.favorite.deleteMany({ where: { groupId: dbGroup.id } });
-      
+      // Add tracks
       for (const track of group.tracks) {
-        await this.saveTrack(track); // Ensure track exists
+        await this.saveTrack(track);
         await prisma.favorite.create({
           data: {
             groupId: dbGroup.id,
