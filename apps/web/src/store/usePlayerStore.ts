@@ -22,7 +22,29 @@ interface PlayerState {
   // Actions
   setUserId: (userId: string | null) => Promise<void>;
   setCurrentTrack: (track: Track) => void;
-  // ... rest of actions
+  togglePlay: () => void;
+  loadHistory: () => Promise<void>;
+  loadFavorites: () => Promise<void>;
+  loadRecommendations: () => Promise<void>;
+  loadAIRecommendations: (force?: boolean) => Promise<void>;
+  addToHistory: (track: Track) => Promise<void>;
+  toggleFavorite: (track: Track) => Promise<void>;
+  createGroup: (name: string) => Promise<void>;
+  renameGroup: (id: string, name: string) => Promise<void>;
+  addTrackToGroup: (track: Track, groupId: string) => Promise<void>;
+  removeTrackFromGroup: (trackId: string, groupId: string) => Promise<void>;
+  removeFromAllGroups: (trackId: string) => Promise<void>;
+  refreshRecentTracks: () => Promise<void>;
+  updateTrackTags: (trackId: string, tags: string[]) => Promise<void>;
+  loadAllTags: () => Promise<void>;
+  setFilteredTracksByTag: (tag: string | null) => Promise<void>;
+  setActiveTag: (tag: string | null) => void;
+  setTrackExcluded: (trackId: string, excluded: boolean) => Promise<void>;
+  setSelectedGroupId: (id: string | null) => void;
+  setLyricsOpen: (open: boolean) => void;
+  removeFromHistory: (trackId: string) => Promise<void>;
+  setCurrentTime: (time: number) => void;
+  restoreFromBackup: (data: { tracks?: Track[], history?: PlayHistory[], favorites?: FavoriteGroup[] }) => Promise<void>;
 }
 
 const storage = new BackendStorageProvider();
