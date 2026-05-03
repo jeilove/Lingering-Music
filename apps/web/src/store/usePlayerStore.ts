@@ -441,8 +441,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
     
     const history = data.history || [];
+    
     // db.json stores favorites under 'favoriteGroups', new format uses 'favorites'
+    // We explicitly check both and ensure we pass them to the migrateBatch function
     const favorites = data.favorites || data.favoriteGroups || [];
+    
+    console.log(`[Restore] Tracks: ${tracks.length}, History: ${history.length}, Favorites: ${favorites.length}`);
     
     // Call backend migrate Batch
     await storage.migrateBatch(tracks, history, favorites);
