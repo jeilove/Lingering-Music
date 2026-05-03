@@ -434,27 +434,43 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   restoreFromBackup: async (data) => {
     await storage.init();
     
-    // Convert tracks object to array if needed (for db.json compatibility)
+    console.log('[Restore] Original Data Keys:', Object.keys(data));
+    
+    // 1. Convert tracks (handle both Object and Array)
     let tracks = data.tracks || [];
     if (tracks && typeof tracks === 'object' && !Array.isArray(tracks)) {
       tracks = Object.values(tracks);
     }
     
+    // 2. Handle History
     const history = data.history || [];
     
-    // db.json stores favorites under 'favoriteGroups', new format uses 'favorites'
-    // We explicitly check both and ensure we pass them to the migrateBatch function
-    const favorites = data.favorites || data.favoriteGroups || [];
+    // 3. Handle Favorites (Defensive check for multiple possible keys)
+    // Legacy db.json uses 'favoriteGroups', some versions might use 'favorites' or 'groups'
+    const favorites = data.favorites || data.favoriteGroups || data.groups || [];
     
-    console.log(`[Restore] Tracks: ${tracks.length}, History: ${history.length}, Favorites: ${favorites.length}`);
+    console.log('[Restore] Processed Data:', {
+      tracksCount: tracks.length,
+      historyCount: history.length,
+      favoritesCount: favorites.length
+    });
     
-    // Call backend migrate Batch
-    await storage.migrateBatch(tracks, history, favorites);
-    
-    // Reload state
-    await get().loadHistory();
-    await get().loadFavorites();
-    alert('백업 데이터 복원이 완료되었습니다!');
+    if (favorites.length === 0) {
+      console.warn('[Restore] No favorites found! Data sample:', JSON.stringify(data).substring(0, 500));
+    }
+
+    try {
+      // Call backend migrate Batch
+      await storage.migrateBatch(tracks, history, favorites);
+      
+      // Reload state
+      await get().loadHistory();
+      await get().loadFavorites();
+      alert(`백업 데이터 복원이 완료되었습니다!\n(노래: ${tracks.length}곡, 히스토리: ${history.length}개, 즐겨찾기: ${favorites.length}그룹)`);
+    } catch (error) {
+      console.error('[Restore] Migration failed:', error);
+      alert('데이터 복구 중 오류가 발생했습니다. 콘솔 로그를 확인해주세요.');
+    }
   }
 }));
 
