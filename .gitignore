@@ -1,6 +1,8 @@
 node_modules/
+.next/
 dist/
 build/
+.env
 .env.local
 .env.*.local
 *.log
@@ -9,4 +11,11 @@ build/
 __pycache__/
 *.pyc
 .idea/
-.vscode/local.code-workspace
+.vscode/
+
+# Local DB
+apps/server/data/
+
+# OS files
+Thumbs.db
+desktop.ini
