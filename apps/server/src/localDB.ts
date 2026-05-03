@@ -188,13 +188,23 @@ class NeonDB {
     try {
       console.log(`[NeonDB] bulkSave starting for user: ${userId}. Tracks: ${tracks.length}, History: ${history.length}, Favorites: ${favorites.length}`);
       
+      // 0. CRITICAL: Ensure user exists in User table before creating related records
+      // This prevents P2003 foreign key constraint errors
+      await prisma.user.upsert({
+        where: { id: userId },
+        update: {},
+        create: { 
+          id: userId,
+          email: `${userId}@migrated.local`, // Placeholder email for migrated users
+        }
+      });
+
       // 1. Tracks (Global)
       for (const t of tracks) {
         await this.saveTrack(t);
       }
 
       // 2. History (User specific)
-      // Clear existing history for this user to avoid duplicates during migration
       await prisma.history.deleteMany({ where: { userId } });
       
       for (const h of history) {
