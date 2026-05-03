@@ -11,7 +11,8 @@ if (!process.env.YTDLP_PATH && isWindows) {
 
 export const config = {
   port: Number(process.env.PORT) || 3001,
-  // On Render/Linux, yt-dlp is usually in the PATH. On Windows, we use the venv path.
-  ytdlpPath: process.env.YTDLP_PATH || (isWindows ? path.resolve(process.cwd(), '../../.venv/Scripts/yt-dlp.exe') : 'yt-dlp'),
+  // On Render/Linux, yt-dlp is installed at /usr/local/bin/yt-dlp
+  ytdlpPath: process.env.YTDLP_PATH || (isWindows ? path.resolve(process.cwd(), '../../.venv/Scripts/yt-dlp.exe') : '/usr/local/bin/yt-dlp'),
   mbUserAgent: process.env.MB_USER_AGENT || 'VibeMusicPlayer/1.0.0',
+  baseUrl: process.env.BASE_URL || 'https://lingering-music.onrender.com',
 } as const;

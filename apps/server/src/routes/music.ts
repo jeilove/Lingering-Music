@@ -14,6 +14,7 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
   const cacheKey = trackId ? `stream:${trackId}` : `stream:${artist}:${title}`;
   const cachedUrl = cache.get(cacheKey);
   if (cachedUrl) {
+    console.log(`[Stream URL] Cache Hit: ${cacheKey}`);
     return res.json({ url: cachedUrl });
   }
 
@@ -23,12 +24,14 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
       '--format', 'bestaudio/best',
       '--no-playlist',
       '--ignore-errors',
+      '--no-warnings',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     ];
 
     if (trackId && trackId.startsWith('yt_')) {
       const realYtId = trackId.replace('yt_', '');
       args.unshift(`https://www.youtube.com/watch?v=${realYtId}`);
-      console.log(`[Stream URL] Direct YouTube ID: ${realYtId}`);
+      console.log(`[Stream URL] Requesting direct YouTube ID: ${realYtId}`);
     } else {
       const keyword = `${artist} - ${title} official audio`;
       args.unshift(`ytsearch2:${keyword}`);
@@ -37,25 +40,37 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
 
     const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       execFile(config.ytdlpPath, args, {
-        timeout: 45000,
+        timeout: 40000,
         encoding: 'utf8',
         env: { ...process.env, PYTHONIOENCODING: 'utf8' },
       }, (error: any, stdout: string, stderr: string) => {
-        if (error && !stdout) reject(error);
-        else resolve({ stdout: (stdout || '').trim(), stderr: stderr || '' });
+        if (error && !stdout) {
+          console.error(`[Stream URL] yt-dlp execution error: ${error.message}`);
+          reject(error);
+        } else {
+          resolve({ stdout: (stdout || '').trim(), stderr: stderr || '' });
+        }
       });
     });
 
-    if (stderr) console.warn('[Stream URL Warning]:', stderr);
+    if (stderr && stderr.includes('ERROR')) {
+      console.error('[Stream URL yt-dlp Error]:', stderr);
+    }
 
     const streamUrl = stdout.split('\n')[0]?.trim();
-    if (!streamUrl) throw new Error('Stream URL not found');
+    if (!streamUrl || !streamUrl.startsWith('http')) {
+      throw new Error(`Invalid stream URL extracted: ${streamUrl?.substring(0, 50)}`);
+    }
 
     cache.set(cacheKey, streamUrl, 300);
+    console.log(`[Stream URL] Success! URL length: ${streamUrl.length}`);
     res.json({ url: streamUrl });
   } catch (error: any) {
-    console.error('YouTube matching error:', error.message);
-    res.status(500).json({ error: 'Failed to find streaming source from YouTube' });
+    console.error('[Stream URL Exception]:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to find streaming source from YouTube',
+      details: error.message
+    });
   }
 });
 

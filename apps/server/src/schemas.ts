@@ -51,26 +51,26 @@ export const Schemas = {
 
   // GET /api/storage/history
   historyQuery: z.object({
-    limit: z.coerce.number().int().positive().max(1000).default(200),
-  }),
+    limit: z.preprocess((val) => (val === '' || val === undefined ? undefined : val), z.coerce.number().int().positive().max(1000).default(200)),
+  }).passthrough(),
 
   // POST /api/storage/history
   addHistory: z.object({
     trackId: z.string().min(1),
     track: TrackSchema.optional(),
-  }),
+  }).passthrough(),
 
   // GET /api/storage/recent
   recentQuery: z.object({
-    limit: z.coerce.number().int().positive().max(200).default(30),
-  }),
+    limit: z.preprocess((val) => (val === '' || val === undefined ? undefined : val), z.coerce.number().int().positive().max(200).default(30)),
+  }).passthrough(),
 
   // GET /api/stream-url
   streamUrlQuery: z.object({
     title: z.string().min(1, 'title 파라미터가 필요합니다'),
     artist: z.string().min(1, 'artist 파라미터가 필요합니다'),
     id: z.string().optional(),
-  }),
+  }).passthrough(),
 
   // GET /api/download
   downloadQuery: z.object({
