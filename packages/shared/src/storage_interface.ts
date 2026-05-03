@@ -1,13 +1,14 @@
 export interface Track {
-  id: string; // MusicBrainz Recording ID
+  id: string; // MusicBrainz Recording ID or yt_ID
   title: string;
   artist: string;
   album: string;
-  duration: number; // in seconds
+  duration: number | null; // in seconds
   coverUrl: string | null;
   releaseYear: number | string | null;
   tags?: string[];
-  sourceUrl?: string;
+  url?: string | null;
+  source?: string;
   excludeFromRecs?: boolean;
 }
 

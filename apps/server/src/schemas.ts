@@ -8,11 +8,12 @@ const TrackSchema = z.object({
   title: z.string().min(1),
   artist: z.string().min(1),
   album: z.string(),
-  duration: z.number().nonnegative(),
+  duration: z.number().nonnegative().nullable(),
   coverUrl: z.string().nullable(),
   releaseYear: z.union([z.number(), z.string()]).nullable(),
   tags: z.array(z.string()).optional(),
-  sourceUrl: z.string().optional(),
+  url: z.string().nullable().optional(),
+  source: z.string().optional(),
   excludeFromRecs: z.boolean().optional(),
 });
 
