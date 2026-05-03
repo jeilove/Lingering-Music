@@ -73,36 +73,39 @@ export default function SettingsPage() {
             </div>
 
             <div className="glass-card rounded-2xl border border-white/5 divide-y divide-white/5 overflow-hidden">
-              {section.items.map((item, itemIdx) => (
-                <div key={itemIdx} className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
-                  <span className="text-sm text-white/80">{item.label}</span>
-                  <div className="flex items-center gap-4">
-                    {('status' in item) && item.status === 'online' && (
-                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
-                        <div className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                        ONLINE
-                      </span>
-                    )}
-                    {item.value && <span className="text-xs text-muted-foreground">{item.value}</span>}
-                    {item.action && (
-                      <button className="text-xs font-bold text-primary hover:underline transition-all">
-                        {item.action}
-                      </button>
-                    )}
-                    {item.toggle !== undefined && (
-                      <button className={cn(
-                        "w-10 h-5 rounded-full p-1 transition-all duration-300 relative",
-                        item.toggle ? "bg-primary" : "bg-white/10"
-                      )}>
-                        <div className={cn(
-                          "w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-lg",
-                          item.toggle ? "translate-x-5" : "translate-x-0"
-                        )} />
-                      </button>
-                    )}
+              {section.items.map((rawItem, itemIdx) => {
+                const item = rawItem as any;
+                return (
+                  <div key={itemIdx} className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
+                    <span className="text-sm text-white/80">{item.label}</span>
+                    <div className="flex items-center gap-4">
+                      {('status' in item) && item.status === 'online' && (
+                        <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                          <div className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                          ONLINE
+                        </span>
+                      )}
+                      {item.value && <span className="text-xs text-muted-foreground">{item.value}</span>}
+                      {item.action && (
+                        <button className="text-xs font-bold text-primary hover:underline transition-all">
+                          {item.action}
+                        </button>
+                      )}
+                      {item.toggle !== undefined && (
+                        <button className={cn(
+                          "w-10 h-5 rounded-full p-1 transition-all duration-300 relative",
+                          item.toggle ? "bg-primary" : "bg-white/10"
+                        )}>
+                          <div className={cn(
+                            "w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-lg",
+                            item.toggle ? "translate-x-5" : "translate-x-0"
+                          )} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}
