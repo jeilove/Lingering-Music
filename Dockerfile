@@ -50,8 +50,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/server/package.json ./apps/server/
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/prisma ./prisma
 
 # Set environment variables
