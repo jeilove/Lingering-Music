@@ -1,0 +1,15 @@
+{
+  "name": "music-player-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:server": "pnpm --filter server dev",
+    "dev": "pnpm --filter ./apps/* --parallel dev",
+    "build": "pnpm --filter \"*\" build",
+    "install:all": "pnpm install"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"E:/바이브코딩/뮤직플레이어\\\" && git status --short\"}",
+  "error": "Exit code 128\nfatal: not a git repository (or any of the parent directories): .git",
+  "timestamp": "2026-04-16T23:15:16.834Z",
+  "retry_count": 1
+}

@@ -1,0 +1,125 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776342244258,
+  "projectRoot": "E:\\바이브코딩\\뮤직플레이어",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev:web": "pnpm --filter web dev",
+      "dev:server": "pnpm --filter server dev",
+      "dev": "pnpm --filter ./apps/* --parallel dev",
+      "build": "pnpm --filter \"*\" build",
+      "install:all": "pnpm install"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1776342243760,
+      "keyFiles": []
+    },
+    "packages": {
+      "path": "packages",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1776342243763,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "apps\\server\\src\\index.ts",
+      "accessCount": 16,
+      "lastAccessed": 1776380845127,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 3,
+      "lastAccessed": 1776343074454,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\server\\src\\localDB.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776343329928,
+      "type": "file"
+    },
+    {
+      "path": "packages\\shared\\src\\storage_interface.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776343511033,
+      "type": "file"
+    },
+    {
+      "path": "apps\\server\\src\\schemas.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776343632344,
+      "type": "file"
+    },
+    {
+      "path": "apps\\server\\.env.example",
+      "accessCount": 1,
+      "lastAccessed": 1776380953951,
+      "type": "file"
+    },
+    {
+      "path": "apps\\server\\src\\config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776380956292,
+      "type": "file"
+    },
+    {
+      "path": "apps\\server\\src\\cache.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776380958710,
+      "type": "file"
+    },
+    {
+      "path": "apps\\server\\src\\routes\\storage.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776381173555,
+      "type": "file"
+    },
+    {
+      "path": "apps\\server\\src\\routes\\music.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776381177842,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

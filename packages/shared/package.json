@@ -1,0 +1,10 @@
+{
+  "name": "@music-player/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/storage_interface.ts",
+  "types": "src/storage_interface.ts",
+  "dependencies": {
+    "typescript": "^5.0.0"
+  }
+}
