@@ -1,13 +1,25 @@
 # CHANGELOG
 
-## [2026-05-03]
-### 추가됨
-- **사용자 데이터 백업 및 복원 기능**: 플레이어 상단 로그인 버튼 좌측에 사용자의 재생 기록과 즐겨찾기(`db.json` 호환) 데이터를 JSON 파일로 다운로드하고 업로드하여 복원할 수 있는 기능 추가.
+## [1.2.0] - 2026-05-03
+#### Added
+- **Complete Cloud Migration**: Successfully deployed frontend to Vercel and backend to Render.
+- **Database Transition**: Migrated from local `db.json` to Neon PostgreSQL (Prisma).
+- **Multi-User Support**: Implemented Google OAuth via NextAuth.js for personalized music storage.
+- **Robust Backup/Restore**: Created a defensive data migration tool to import legacy `db.json` into the cloud.
+
+#### Fixed
+- **Deployment Blockers**: Resolved Vercel build errors (Type mismatches) and Render connectivity issues.
+- **OAuth URI Mismatch**: Fixed Google Login "Invalid Request" errors by aligning redirect URIs.
+- **Data Integrity**: Resolved P2003 Foreign Key constraint errors and key name mismatches during cloud migration.
+- **Zombies**: Upgraded `run.bat` to prevent ghost processes in the local environment.
+- **사용자 데이터 백업 및 복원 기능**: 플레이어 상단 로그인 버튼 좌측에 사용자의 재생 기록과 즐겨찾기 데이터를 JSON 파일로 다운로드하고 업로드하여 복원할 수 있는 기능 추가.
 - **Auth.js (NextAuth v5) 연동**: Neon DB와의 사용자 데이터 동기화를 위해 Google 로그인 기능을 실제 구현했습니다. (`signIn`, `signOut`, `useSession` 적용)
 - **Google 로그인 버튼 추가**: 검색창 우측에 DB 동기화 및 개인화를 위한 Google 로그인 버튼을 구현했습니다.
 
-### 변경됨
-- **사이드바 메뉴 정리**: 사용자의 요청에 따라 'AI 실험실' 및 '환경설정' 메뉴를 제거하여 UI를 단순화했습니다.
+### 수정됨
+- **타입 안정성 강화**: `Track` 인터페이스의 `duration` 필드를 `null` 허용으로 변경하고, 프론트엔드 모든 컴포넌트(`CompactTrackItem`, `LyricsPanel` 등)에서 널 체크 로직을 적용하여 빌드 안정성을 확보했습니다.
+- **프로젝트 실행 배치 파일 업그레이드**: 좀비 프로세스 자동 정리 및 브라우저 자동 실행 기능이 포함된 프리미엄 관리 도구로 `run.bat`을 전면 개편했습니다.
+- **사이드바 메뉴 정리**: 사용자의 요청에 따라 'AI 실험실' 및 '환경설정' 메뉴를 제거하여 UI를 단순화했습니다. (중복 항목 제거)
 
 ## [2026-04-05]
 ### 추가됨
