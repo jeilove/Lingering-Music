@@ -39,7 +39,7 @@ export function LyricsPanel() {
         currentTrack.title, 
         currentTrack.artist, 
         currentTrack.album, 
-        currentTrack.duration
+        currentTrack.duration ?? undefined
       );
       setLyrics(data);
       if (data?.syncedLyrics) {

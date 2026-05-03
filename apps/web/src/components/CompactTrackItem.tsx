@@ -72,7 +72,7 @@ export function CompactTrackItem({ track, onClick, active, accentColor = 'primar
           <Download className="w-3.5 h-3.5" />
         </button>
         <span className="text-[9px] text-white/20 font-medium tabular-nums">
-          {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
+          {Math.floor((track.duration || 0) / 60)}:{((track.duration || 0) % 60).toString().padStart(2, '0')}
         </span>
       </div>
     </div>
