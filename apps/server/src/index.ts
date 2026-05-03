@@ -6,7 +6,33 @@ import musicRouter from './routes/music';
 
 const app = express();
 
-app.use(cors({ origin: true, credentials: true }));
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  /\.vercel\.app$/, // Allow any vercel preview/production deployment
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.some(ao => {
+      if (typeof ao === 'string') return ao === origin;
+      return ao.test(origin);
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+}));
 
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Private-Network', 'true');

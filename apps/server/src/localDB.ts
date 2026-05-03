@@ -257,9 +257,3 @@ class NeonDB {
 }
 
 export const localDB = new NeonDB();
-ks[id])
-      .filter((t): t is Track => !!t);
-  }
-}
-
-export const localDB = new LocalDB();
