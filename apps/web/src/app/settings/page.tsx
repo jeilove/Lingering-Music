@@ -77,7 +77,7 @@ export default function SettingsPage() {
                 <div key={itemIdx} className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
                   <span className="text-sm text-white/80">{item.label}</span>
                   <div className="flex items-center gap-4">
-                    {item.status === 'online' && (
+                    {('status' in item) && item.status === 'online' && (
                       <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
                         <div className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
                         ONLINE
