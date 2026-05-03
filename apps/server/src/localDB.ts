@@ -99,10 +99,13 @@ class NeonDB {
 
   async saveFavoriteGroup(userId: string, group: FavoriteGroup) {
     try {
-      // 1. Upsert the group
+      // 1. Upsert the group - CRITICAL: Update userId to ensure ownership if migrating from anonymous
       const dbGroup = await prisma.favoriteGroup.upsert({
         where: { id: group.id },
-        update: { name: group.name },
+        update: { 
+          name: group.name,
+          userId: userId // Take ownership
+        },
         create: { 
           id: group.id,
           name: group.name,
@@ -183,26 +186,37 @@ class NeonDB {
 
   async bulkSave(userId: string, tracks: Track[], history: PlayHistory[], favorites: FavoriteGroup[]) {
     try {
-      // 1. Tracks
+      console.log(`[NeonDB] bulkSave starting for user: ${userId}. Tracks: ${tracks.length}, History: ${history.length}, Favorites: ${favorites.length}`);
+      
+      // 1. Tracks (Global)
       for (const t of tracks) {
         await this.saveTrack(t);
       }
 
-      // 2. History
+      // 2. History (User specific)
+      // Clear existing history for this user to avoid duplicates during migration
+      await prisma.history.deleteMany({ where: { userId } });
+      
       for (const h of history) {
-        await prisma.history.create({
-          data: {
-            userId,
-            trackId: h.trackId,
-            timestamp: new Date(h.playedAt)
-          }
-        });
+        try {
+          await prisma.history.create({
+            data: {
+              userId,
+              trackId: h.trackId,
+              timestamp: new Date(h.playedAt)
+            }
+          });
+        } catch (e) {
+          // Skip individual failures (e.g. invalid date or missing track)
+        }
       }
 
-      // 3. Favorites
+      // 3. Favorites (User specific)
       for (const g of favorites) {
         await this.saveFavoriteGroup(userId, g);
       }
+      
+      console.log(`[NeonDB] bulkSave completed for user: ${userId}`);
     } catch (error) {
       console.error('[NeonDB] bulkSave error:', error);
     }
