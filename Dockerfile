@@ -21,8 +21,7 @@ COPY . .
 # Generate Prisma Client
 RUN pnpm prisma generate
 
-# Build shared and server
-RUN pnpm --filter @music-player/shared build
+# Build server (shared interfaces are handled by tsc)
 RUN pnpm --filter server build
 
 # Production image
