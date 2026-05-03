@@ -433,7 +433,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   restoreFromBackup: async (data) => {
     await storage.init();
-    const tracks = data.tracks || [];
+    
+    // Convert tracks object to array if needed (for db.json compatibility)
+    let tracks = data.tracks || [];
+    if (tracks && typeof tracks === 'object' && !Array.isArray(tracks)) {
+      tracks = Object.values(tracks);
+    }
+    
     const history = data.history || [];
     const favorites = data.favorites || [];
     
