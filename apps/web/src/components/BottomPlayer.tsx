@@ -34,7 +34,9 @@ export function BottomPlayer() {
     const loadStream = async () => {
       setIsLoading(true);
       try {
+        console.log(`[BottomPlayer] Loading stream for: ${currentTrack.title} (${currentTrack.id})`);
         const url = await getStreamUrl(currentTrack.title, currentTrack.artist, currentTrack.id);
+        console.log(`[BottomPlayer] Resolved stream URL: ${url ? url.substring(0, 100) + '...' : 'NULL'}`);
         
         // 2. Only apply if this relative request is still valid
         if (url && audioRef.current && !isCancelled) {
@@ -42,9 +44,16 @@ export function BottomPlayer() {
           audioRef.current.load(); // Force reset state
           
           if (isPlaying) {
-            audioRef.current.play().catch(e => console.error("Playback start failed:", e));
+            audioRef.current.play().catch(e => {
+              console.error("[BottomPlayer] Playback failed:", e);
+              // Handle autoplay restrictions or other issues
+            });
           }
+        } else if (!url) {
+          console.error("[BottomPlayer] Failed to get stream URL");
         }
+      } catch (err) {
+        console.error("[BottomPlayer] Error in loadStream:", err);
       } finally {
         if (!isCancelled) setIsLoading(false);
       }
@@ -116,8 +125,16 @@ export function BottomPlayer() {
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           )}
-          {currentTrack.coverUrl ? (
-            <img src={currentTrack.coverUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
+          {currentTrack.coverUrl && currentTrack.coverUrl !== 'NA' ? (
+            <img 
+              src={currentTrack.coverUrl} 
+              alt={currentTrack.title} 
+              className="w-full h-full object-cover" 
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = ''; // Clear broken src
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
           ) : (
             <div className="w-full h-full bg-white/5 flex items-center justify-center text-primary/40">
               <Play className="w-6 h-6 fill-current" />
