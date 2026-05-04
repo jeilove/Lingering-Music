@@ -10,6 +10,20 @@ import { Schemas, validateQuery } from '../schemas';
 
 const router: ExpressRouter = Router();
 
+// Helper to get cookies arg if file exists
+const getCookiesArg = () => {
+  const path1 = path.resolve(process.cwd(), 'apps/server/cookies.txt');
+  const path2 = path.resolve(process.cwd(), 'cookies.txt');
+  const finalPath = fs.existsSync(path1) ? path1 : (fs.existsSync(path2) ? path2 : null);
+
+  if (finalPath) {
+    const stats = fs.statSync(finalPath);
+    console.log(`[Cookies] Found at: ${finalPath} (Size: ${stats.size} bytes)`);
+    return ['--cookies', finalPath];
+  }
+  return [];
+};
+
 // ============================================
 // Piped/Invidious API 인스턴스 (실시간 확인된 살아있는 것들만)
 // ============================================
@@ -171,60 +185,114 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
 });
 
 // ============================================
-// API 엔드포인트: MP3 다운로드 (온라인: Piped + ffmpeg)
+// API 엔드포인트: MP3 다운로드 (로컬: yt-dlp, 온라인: Piped+ffmpeg)
 // ============================================
 router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) => {
   const { title, artist } = req.query as { title: string; artist: string };
   const filename = `${artist} - ${title}.mp3`;
+  const isLocal = process.env.NODE_ENV !== 'production';
 
   try {
-    // 1. Piped로 유튜브 검색
-    const searchQuery = `${artist} - ${title}`;
-    console.log(`[Download] Searching Piped for: "${searchQuery}"`);
-    const videoId = await searchYouTubeViaPiped(searchQuery);
-    
-    if (!videoId) {
-      return res.status(404).json({ error: 'YouTube video not found for download' });
-    }
+    if (isLocal) {
+      // --- 로컬 환경: 기존 yt-dlp 방식 사용 ---
+      console.log(`[Download] Local environment detected. Using yt-dlp for: ${filename}`);
+      const keyword = `${artist} - ${title} official audio`;
+      
+      const args = [
+        `ytsearch1:${keyword}`,
+        '--get-url',
+        '--format', 'bestaudio',
+        '--no-playlist',
+        '--ignore-errors',
+        ...getCookiesArg(),
+      ];
 
-    // 2. Piped에서 오디오 URL 가져오기
-    const audioUrl = await getAudioUrlFromPiped(videoId);
-    console.log(`[Download] Got audio URL, starting ffmpeg conversion...`);
+      const { stdout: cleanUrl } = await new Promise<{ stdout: string }>((resolve, reject) => {
+        execFile(config.ytdlpPath, args, {
+          timeout: 30000,
+          encoding: 'utf8',
+        }, (error: any, stdout: string) => {
+          if (error && !stdout) reject(error);
+          else resolve({ stdout: (stdout || '').trim() });
+        });
+      });
 
-    // 3. ffmpeg로 MP3 변환하면서 브라우저로 전송
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      if (!cleanUrl) throw new Error('Download URL not found via yt-dlp');
 
-    const converter = spawn('ffmpeg', [
-      '-i', audioUrl,        // Piped에서 받은 오디오 URL을 직접 입력
-      '-f', 'mp3',           // MP3 형식
-      '-ab', '192k',         // 비트레이트 192kbps (다운로드는 고품질)
-      '-v', 'error',
-      'pipe:1',              // stdout으로 출력
-    ]);
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
-    converter.stdout.pipe(res);
+      const downloader = spawn(config.ytdlpPath, [
+        cleanUrl,
+        '--ignore-errors',
+        '-x',
+        '--audio-format', 'mp3',
+        '--audio-quality', '0',
+        '-o', '-',
+        '--no-playlist',
+      ]);
 
-    converter.stderr.on('data', (data) => {
-      const msg = data.toString().trim();
-      if (msg) console.error(`[Download ffmpeg]: ${msg}`);
-    });
+      downloader.stdout.pipe(res);
+      downloader.on('error', (err) => console.error(`[Download yt-dlp spawn error]:`, err));
+      downloader.on('close', (code) => {
+        if (code !== 0 && !res.headersSent) res.status(500).end();
+      });
+      req.on('close', () => downloader.kill());
 
-    converter.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`[Download] ffmpeg exited with code ${code}`);
-        if (!res.headersSent) res.status(500).end();
-      } else {
-        console.log(`[Download] Successfully converted: ${filename}`);
+    } else {
+      // --- 프로덕션(Render) 환경: Piped + ffmpeg 방식 사용 ---
+      console.log(`[Download] Production environment detected. Using Piped+ffmpeg for: ${filename}`);
+      
+      const searchQuery = `${artist} - ${title}`;
+      const videoId = await searchYouTubeViaPiped(searchQuery);
+      
+      if (!videoId) {
+        throw new Error('YouTube video not found for download via Piped');
       }
-    });
 
-    req.on('close', () => {
-      converter.kill();
-    });
+      const audioUrl = await getAudioUrlFromPiped(videoId);
+      console.log(`[Download] Got audio URL, starting ffmpeg conversion...`);
+
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+
+      const converter = spawn('ffmpeg', [
+        '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        '-i', audioUrl,
+        '-f', 'mp3',
+        '-ab', '192k',
+        '-v', 'error',
+        'pipe:1',
+      ]);
+
+      converter.stdout.pipe(res);
+
+      converter.stderr.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg) console.error(`[Download ffmpeg]: ${msg}`);
+      });
+
+      converter.on('error', (err) => {
+        console.error(`[Download ffmpeg spawn error]:`, err);
+        if (!res.headersSent) res.status(500).end();
+      });
+
+      converter.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`[Download] ffmpeg exited with code ${code}`);
+          if (!res.headersSent) res.status(500).end();
+        } else {
+          console.log(`[Download] Successfully converted: ${filename}`);
+        }
+      });
+
+      req.on('close', () => converter.kill());
+    }
   } catch (error: any) {
     console.error('[Download Exception]:', error.message);
-    if (!res.headersSent) res.status(500).json({ error: 'Failed to download track' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to download track', details: error.message });
+    }
   }
 });
 
