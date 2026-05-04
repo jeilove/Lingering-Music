@@ -240,71 +240,63 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
       req.on('close', () => downloader.kill());
 
     } else {
-      // --- 프로덕션(Render) 환경: Cobalt API 방식 사용 (403 차단 및 ffmpeg 부하 우회) ---
-      console.log(`[Download] Production environment detected. Using Cobalt API for: ${filename}`);
+      // --- 프로덕션(Render) 환경: Piped(검색) + yt-dlp(다운로드) 조합 ---
+      console.log(`[Download] Production environment detected. Using Piped(Search) + yt-dlp(Download) for: ${filename}`);
       
+      // 1. Piped API를 통해 검색어에 대한 정확한 videoId 획득 (ytsearch 봇 차단 우회)
       const searchQuery = `${artist} - ${title}`;
       const videoId = await searchYouTubeViaPiped(searchQuery);
       
       if (!videoId) {
-        throw new Error('YouTube video not found for download');
+        throw new Error('YouTube video not found for download via Piped');
       }
 
-      console.log(`[Download] Requesting MP3 conversion from Cobalt API for videoId: ${videoId}`);
-
-      // Cobalt API를 사용하여 유튜브 비디오를 MP3로 변환 및 프록시 다운로드 링크 획득
-      let downloadUrl = '';
-      try {
-        const cobaltRes = await axios.post('https://api.cobalt.tools/', {
-          url: `https://www.youtube.com/watch?v=${videoId}`,
-          isAudioOnly: true,
-          aFormat: 'mp3'
-        }, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-            'Origin': 'https://cobalt.tools',
-            'Referer': 'https://cobalt.tools/'
-          },
-          timeout: 20000
-        });
-
-        if (cobaltRes.data && cobaltRes.data.url) {
-          downloadUrl = cobaltRes.data.url;
-          console.log(`[Download] Cobalt API success! Fetching stream...`);
-        } else {
-          throw new Error('Cobalt API failed to return a valid download URL');
-        }
-      } catch (cobaltErr: any) {
-        console.error(`[Cobalt API Error]:`, cobaltErr.response?.data || cobaltErr.message);
-        throw new Error(`Cobalt API Error: ${JSON.stringify(cobaltErr.response?.data || cobaltErr.message)}`);
-      }
-
-      // Cobalt가 제공한 MP3 URL의 스트림을 가져와 클라이언트에게 전달
-      const audioStreamResponse = await axios({
-        method: 'get',
-        url: downloadUrl,
-        responseType: 'stream',
-        timeout: 30000,
-      });
+      console.log(`[Download] Found videoId: ${videoId}. Starting yt-dlp download...`);
 
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
-      audioStreamResponse.data.pipe(res);
+      // 2. 정확한 URL을 yt-dlp에 전달하여 다운로드 및 변환 (검색은 안 하지만 다운로드는 우회 가능성 높음)
+      const targetUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      
+      const args = [
+        targetUrl,
+        '--ignore-errors',
+        '-x',
+        '--audio-format', 'mp3',
+        '--audio-quality', '0',
+        '-o', '-',
+        '--no-playlist',
+        ...getCookiesArg(),
+      ];
 
-      audioStreamResponse.data.on('end', () => {
-        console.log(`[Download] Successfully sent MP3 to client: ${filename}`);
+      const downloader = spawn(config.ytdlpPath, args);
+
+      downloader.stdout.pipe(res);
+
+      downloader.stderr.on('data', (data) => {
+        const msg = data.toString().trim();
+        // 콘솔 도배 방지를 위해 에러나 주요 정보만 로깅
+        if (msg && (msg.includes('ERROR') || msg.includes('WARNING'))) {
+          console.error(`[Download yt-dlp]: ${msg}`);
+        }
       });
 
-      audioStreamResponse.data.on('error', (err: any) => {
-        console.error(`[Download] Stream transmission error:`, err.message);
+      downloader.on('error', (err) => {
+        console.error(`[Download yt-dlp spawn error]:`, err);
+        if (!res.headersSent) res.status(500).end();
       });
 
-      req.on('close', () => {
-        audioStreamResponse.data.destroy();
+      downloader.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`[Download] yt-dlp exited with code ${code}`);
+          if (!res.headersSent) res.status(500).end();
+        } else {
+          console.log(`[Download] Successfully converted: ${filename}`);
+        }
       });
+
+      req.on('close', () => downloader.kill());
     }
   } catch (error: any) {
     console.error('[Download Exception]:', error.message);
