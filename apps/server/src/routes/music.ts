@@ -38,28 +38,30 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
   try {
     let args = [
       '--get-url',
-      '--format', 'bestaudio',
+      '--format', 'bestaudio/best',
       '--no-playlist',
       '--ignore-errors',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=ios',
-      '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       ...getCookiesArg(),
     ];
 
     if (trackId && trackId.startsWith('yt_')) {
       const realYtId = trackId.replace('yt_', '');
-      args.unshift(`https://www.youtube.com/watch?v=${realYtId}`);
+      args.push(`https://www.youtube.com/watch?v=${realYtId}`);
+      // Use ios client for direct ID as it's more stable for playback
+      args.push('--extractor-args', 'youtube:player_client=ios,web');
       console.log(`[Stream URL] Requesting direct YouTube ID: ${realYtId}`);
     } else {
-      const keyword = `${artist} - ${title} official audio`;
-      args.unshift(`ytsearch2:${keyword}`);
+      const keyword = `${artist} - ${title}`;
+      // Use web client for search as ios client sometimes fails searching
+      args.push(`ytsearch1:${keyword}`);
       console.log(`[Stream URL] Searching for: "${keyword}"`);
     }
 
     const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       execFile(config.ytdlpPath, args, {
-        timeout: 40000,
+        timeout: 45000,
         encoding: 'utf8',
         env: { ...process.env, PYTHONIOENCODING: 'utf8' },
       }, (error: any, stdout: string, stderr: string) => {

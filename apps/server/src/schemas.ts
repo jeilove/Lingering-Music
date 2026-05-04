@@ -7,15 +7,15 @@ const TrackSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   artist: z.string().min(1),
-  album: z.string(),
-  duration: z.number().nonnegative().nullable(),
-  coverUrl: z.string().nullable(),
-  releaseYear: z.union([z.number(), z.string()]).nullable(),
+  album: z.string().nullable().optional().default('Unknown Album'),
+  duration: z.number().nonnegative().nullable().optional().default(0),
+  coverUrl: z.string().nullable().optional(),
+  releaseYear: z.union([z.number(), z.string()]).nullable().optional(),
   tags: z.array(z.string()).optional(),
   url: z.string().nullable().optional(),
   source: z.string().optional(),
   excludeFromRecs: z.boolean().optional(),
-});
+}).passthrough();
 
 const FavoriteGroupSchema = z.object({
   id: z.string().min(1),
