@@ -79,43 +79,72 @@ async function getAudioUrlFromPiped(videoId: string): Promise<string> {
     return cached as string;
   }
 
-  // 1차: Piped API 시도
-  const pipedData = await pipedFetch(`/streams/${videoId}`);
-  if (pipedData && pipedData.audioStreams && pipedData.audioStreams.length > 0) {
-    // 브라우저 호환성이 좋은 M4A(mp4) 형식을 최우선으로 선택
-    const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => {
-      const aIsMp4 = a.format === 'M4A' || (a.mimeType && a.mimeType.includes('mp4'));
-      const bIsMp4 = b.format === 'M4A' || (b.mimeType && b.mimeType.includes('mp4'));
-      if (aIsMp4 && !bIsMp4) return -1;
-      if (!aIsMp4 && bIsMp4) return 1;
-      return (b.bitrate || 0) - (a.bitrate || 0);
-    })[0];
-    
-    console.log(`[Piped] Audio found: ${bestAudio.quality || bestAudio.bitrate}kbps, format: ${bestAudio.format || bestAudio.mimeType}`);
-    // IP 바인딩 문제를 피하기 위해 프록시 URL이 있으면 우선 사용
-    const finalUrl = bestAudio.proxyUrl || bestAudio.url;
-    cache.set(cacheKey, finalUrl, 300);
-    return finalUrl;
+  // 1차: Piped API 시도 (여러 인스턴스를 돌며 유효한 proxyUrl을 가진 스트림 찾기)
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      console.log(`[Audio-Piped] Trying instance: ${instance}`);
+      const pipedData = await axios.get(`${instance}/streams/${videoId}`, { timeout: 10000 }).then(r => r.data);
+      
+      if (pipedData && pipedData.audioStreams && pipedData.audioStreams.length > 0) {
+        // 프록시 URL이 있는 스트림을 우선적으로 찾고, 그 중 M4A 형식을 선호
+        const streams = pipedData.audioStreams.filter((s: any) => s.proxyUrl || s.url);
+        if (streams.length === 0) continue;
+
+        const bestAudio = streams.sort((a: any, b: any) => {
+          // 1순위: proxyUrl 존재 여부
+          if (a.proxyUrl && !b.proxyUrl) return -1;
+          if (!a.proxyUrl && b.proxyUrl) return 1;
+          
+          // 2순위: M4A 포맷 선호
+          const aIsMp4 = a.format === 'M4A' || (a.mimeType && a.mimeType.includes('mp4'));
+          const bIsMp4 = b.format === 'M4A' || (b.mimeType && b.mimeType.includes('mp4'));
+          if (aIsMp4 && !bIsMp4) return -1;
+          if (!aIsMp4 && bIsMp4) return 1;
+          
+          // 3순위: 비트레이트
+          return (b.bitrate || 0) - (a.bitrate || 0);
+        })[0];
+        
+        const finalUrl = bestAudio.proxyUrl || bestAudio.url;
+        console.log(`[Piped] Audio found on ${instance}: ${bestAudio.format || 'unknown'}, Proxied: ${!!bestAudio.proxyUrl}`);
+        
+        cache.set(cacheKey, finalUrl, 300);
+        return finalUrl;
+      }
+    } catch (err: any) {
+      console.warn(`[Audio-Piped] Instance ${instance} failed: ${err.message}`);
+    }
   }
 
   // 2차: Invidious API 시도
-  console.log(`[Audio] Piped failed, trying Invidious for: ${videoId}`);
-  const invData = await invidiousFetch(`/videos/${videoId}`);
-  if (invData && invData.adaptiveFormats) {
-    const audioFormats = invData.adaptiveFormats.filter((f: any) => f.type?.startsWith('audio/'));
-    if (audioFormats.length > 0) {
-      // 브라우저 호환성이 좋은 mp4 형식을 최우선으로 선택
-      const bestAudio = audioFormats.sort((a: any, b: any) => {
-        const aIsMp4 = a.type && a.type.includes('mp4');
-        const bIsMp4 = b.type && b.type.includes('mp4');
-        if (aIsMp4 && !bIsMp4) return -1;
-        if (!aIsMp4 && bIsMp4) return 1;
-        return (b.bitrate || 0) - (a.bitrate || 0);
-      })[0];
-      
-      console.log(`[Invidious] Audio found: ${bestAudio.bitrate}bps, type: ${bestAudio.type}`);
-      cache.set(cacheKey, bestAudio.url, 300);
-      return bestAudio.url;
+  console.log(`[Audio] Piped all failed, trying Invidious for: ${videoId}`);
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const invData = await axios.get(`${instance}/api/v1/videos/${videoId}`, { timeout: 10000 }).then(r => r.data);
+      if (invData && invData.adaptiveFormats) {
+        const audioFormats = invData.adaptiveFormats.filter((f: any) => f.type?.startsWith('audio/'));
+        if (audioFormats.length > 0) {
+          const bestAudio = audioFormats.sort((a: any, b: any) => {
+            const aIsMp4 = a.type && a.type.includes('mp4');
+            const bIsMp4 = b.type && b.type.includes('mp4');
+            if (aIsMp4 && !bIsMp4) return -1;
+            if (!aIsMp4 && bIsMp4) return 1;
+            return (b.bitrate || 0) - (a.bitrate || 0);
+          })[0];
+          
+          let url = bestAudio.url;
+          // Invidious도 자체 프록시 파라미터가 있다면 활용 (인스턴스마다 다를 수 있음)
+          if (!url.includes('proxy=true') && instance.includes('inv')) {
+            // url = `${url}&proxy=true`; // 일부 인스턴스는 지원 안 할 수 있어 주의 필요
+          }
+
+          console.log(`[Invidious] Audio found on ${instance}: ${bestAudio.type}`);
+          cache.set(cacheKey, url, 300);
+          return url;
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[Audio-Invidious] Instance ${instance} failed: ${err.message}`);
     }
   }
 
