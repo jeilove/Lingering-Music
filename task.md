@@ -1,19 +1,17 @@
 # Task: Music Player UI Stabilization & Persistence
 
-## Status: Completed (LocalDB & Optimization Phase)
+## Status: Completed (Cloud & Streaming Stabilization Phase)
 
 ### Completed Items
-- [x] Create `TrackCard.tsx` and `CompactTrackItem.tsx` with robust image fallbacks.
-- [x] Persist `activeTag` and `selectedGroupId` in `localStorage` & `usePlayerStore`.
-- [x] Implement `/api/yt-search` in server for high-quality recommendations with thumbnails.
-- [x] **Local Hard Disk Storage**: Migrated from IndexedDB to `db.json` file on the server.
-- [x] **Network Optimization**: Reduced request flood by moving hydration logic to the backend.
-- [x] **Multi-select Favorites**: Allow one track to be in multiple groups.
-- [x] **Upgraded Recommendation Engine**: Diverse discovery using tags + artists.
+- [x] **Frontend-Centric Architecture**: Moved music search/extraction to client-side.
+- [x] **IP-Binding Bypass**: Implemented Piped Proxied Streaming for 403-free playback.
+- [x] **CORS Resilience**: Built multi-instance client-side fallback system.
+- [x] **Cloud Deployment**: Successfully deployed to Vercel (Web) & Render (API + DB).
+- [x] **Google Auth**: Integrated NextAuth with Neon PostgreSQL.
 
 ### Planned / Next Steps
-- [ ] Implement user-friendly "Settings" page for storage path configuration.
-- [ ] Add "Export/Import" feature for manually backing up `db.json`.
+- [ ] Implement "Download" progress indicator in the custom modal.
+- [ ] Add more Piped instances to the rotation for 99.9% uptime.
 
 ### Known Issues
-- YouTube stream URLs have a transient nature; server-side caching is optimized to refresh every 5-10 minutes.
+- External downloaders (ssyou.online) require manual copy-paste due to browser sandbox limits.
