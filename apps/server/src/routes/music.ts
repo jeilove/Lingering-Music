@@ -64,8 +64,16 @@ async function getAudioUrlFromPiped(videoId: string): Promise<string> {
   // 1차: Piped API 시도
   const pipedData = await pipedFetch(`/streams/${videoId}`);
   if (pipedData && pipedData.audioStreams && pipedData.audioStreams.length > 0) {
-    const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-    console.log(`[Piped] Audio found: ${bestAudio.quality || bestAudio.bitrate}kbps`);
+    // 브라우저 호환성이 좋은 M4A(mp4) 형식을 최우선으로 선택
+    const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => {
+      const aIsMp4 = a.format === 'M4A' || (a.mimeType && a.mimeType.includes('mp4'));
+      const bIsMp4 = b.format === 'M4A' || (b.mimeType && b.mimeType.includes('mp4'));
+      if (aIsMp4 && !bIsMp4) return -1;
+      if (!aIsMp4 && bIsMp4) return 1;
+      return (b.bitrate || 0) - (a.bitrate || 0);
+    })[0];
+    
+    console.log(`[Piped] Audio found: ${bestAudio.quality || bestAudio.bitrate}kbps, format: ${bestAudio.format || bestAudio.mimeType}`);
     cache.set(cacheKey, bestAudio.url, 300);
     return bestAudio.url;
   }
@@ -76,8 +84,16 @@ async function getAudioUrlFromPiped(videoId: string): Promise<string> {
   if (invData && invData.adaptiveFormats) {
     const audioFormats = invData.adaptiveFormats.filter((f: any) => f.type?.startsWith('audio/'));
     if (audioFormats.length > 0) {
-      const bestAudio = audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-      console.log(`[Invidious] Audio found: ${bestAudio.bitrate}bps`);
+      // 브라우저 호환성이 좋은 mp4 형식을 최우선으로 선택
+      const bestAudio = audioFormats.sort((a: any, b: any) => {
+        const aIsMp4 = a.type && a.type.includes('mp4');
+        const bIsMp4 = b.type && b.type.includes('mp4');
+        if (aIsMp4 && !bIsMp4) return -1;
+        if (!aIsMp4 && bIsMp4) return 1;
+        return (b.bitrate || 0) - (a.bitrate || 0);
+      })[0];
+      
+      console.log(`[Invidious] Audio found: ${bestAudio.bitrate}bps, type: ${bestAudio.type}`);
       cache.set(cacheKey, bestAudio.url, 300);
       return bestAudio.url;
     }
