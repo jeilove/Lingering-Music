@@ -177,7 +177,7 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
     const audioUrl = await getAudioUrlFromPiped(videoId);
     
     console.log(`[Stream URL] Success! Audio URL length: ${audioUrl.length}`);
-    res.json({ url: audioUrl });
+    res.json({ url: audioUrl, videoId });
   } catch (error: any) {
     console.error('[Stream URL Exception]:', error.message);
     res.status(500).json({ error: 'Failed to get stream URL', details: error.message });

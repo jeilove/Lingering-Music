@@ -85,20 +85,21 @@ export async function downloadTrack(track: Track): Promise<void> {
       const params = new URLSearchParams({ title: track.title, artist: track.artist });
       window.location.assign(`${API_BASE_URL}/download?${params.toString()}`);
     } else {
-      console.log(`[Download] Production environment detected. Using client-side stream URL fetch...`);
-      alert(`온라인(Render) 환경에서는 구글 봇 차단 방지를 위해 원본 스트림 페이지를 직접 엽니다.\n새 탭이 열리면 화면 중앙의 재생 바 우측 '점 3개(메뉴)' 버튼을 눌러 [다운로드]를 선택해 주세요. (m4a 형식 저장)`);
+      console.log(`[Download] Production environment detected. Redirecting to external downloader...`);
+      alert(`온라인(Render) 환경에서는 구글 봇 차단 및 브라우저 다운로드 차단을 우회하기 위해, 무료/무광고 외부 다운로드 사이트(Dirpy)로 연결해 드립니다.\n\n새 창이 열리면 화면 우측 하단의 [Record Audio] 버튼을 눌러 mp3로 저장해 주세요.`);
       
       const params = new URLSearchParams({ title: track.title, artist: track.artist });
       const res = await fetch(`${API_BASE_URL}/stream-url?${params.toString()}`);
       if (!res.ok) {
-        throw new Error('Failed to fetch stream URL');
+        throw new Error('Failed to fetch video ID for download');
       }
       
       const data = await res.json();
-      if (data.url) {
-        window.open(data.url, '_blank');
+      if (data.videoId) {
+        const targetUrl = `https://dirpy.com/studio?url=https://www.youtube.com/watch?v=${data.videoId}`;
+        window.open(targetUrl, '_blank');
       } else {
-        throw new Error('No audio URL returned');
+        throw new Error('No video ID returned');
       }
     }
   } catch (error) {
