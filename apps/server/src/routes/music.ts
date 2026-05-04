@@ -29,11 +29,15 @@ const getCookiesArg = () => {
 // ============================================
 const PIPED_INSTANCES = [
   'https://api.piped.private.coffee',
+  'https://pipedapi.lunar.icu',
+  'https://pipedapi.kavin.rocks',
+  'https://piped-api.garudalinux.org',
 ];
 
 const INVIDIOUS_INSTANCES = [
   'https://inv.thepixora.com',
   'https://inv.nadeko.net',
+  'https://invidious.nerdvpn.de',
 ];
 
 // Piped API 요청 헬퍼
