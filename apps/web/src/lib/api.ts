@@ -5,8 +5,9 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1
 // Piped/Invidious 인스턴스 (프론트엔드에서 직접 호출 가능한 CORS 허용 인스턴스들)
 const PIPED_INSTANCES = [
   'https://api.piped.private.coffee',
-  'https://pipedapi.lunar.icu',
   'https://pipedapi.kavin.rocks',
+  'https://pipedapi.recloud.it',
+  'https://pipedapi.lunar.icu',
   'https://piped-api.garudalinux.org',
 ];
 
@@ -22,7 +23,8 @@ async function pipedFetch(endpoint: string): Promise<any> {
     try {
       const url = `${instance}${endpoint}`;
       console.log(`[Client-Piped] Trying: ${url}`);
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      // 타임아웃을 15초로 늘림 (일부 인스턴스는 느림)
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
       if (res.ok) return await res.json();
     } catch (err: any) {
       console.warn(`[Client-Piped] ${instance} failed: ${err.message}`);
@@ -139,8 +141,10 @@ export async function getStreamUrl(title: string, artist: string, id?: string): 
         if (!aIsMp4 && bIsMp4) return 1;
         return (b.bitrate || 0) - (a.bitrate || 0);
       })[0];
+      
       console.log(`[getStreamUrl-Client] Success via Piped!`);
-      return bestAudio.url;
+      // IP 바인딩 문제를 피하기 위해 프록시 URL이 있으면 우선 사용
+      return bestAudio.proxyUrl || bestAudio.url;
     }
 
     // 2. Invidious로 시도
