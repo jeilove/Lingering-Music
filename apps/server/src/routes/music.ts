@@ -11,9 +11,16 @@ const router: ExpressRouter = Router();
 
 // Helper to get cookies arg if file exists
 const getCookiesArg = () => {
-  if (fs.existsSync(config.cookiesPath)) {
-    return ['--cookies', config.cookiesPath];
+  const path1 = path.resolve(process.cwd(), 'apps/server/cookies.txt');
+  const path2 = path.resolve(process.cwd(), 'cookies.txt');
+  const finalPath = fs.existsSync(path1) ? path1 : (fs.existsSync(path2) ? path2 : null);
+
+  if (finalPath) {
+    const stats = fs.statSync(finalPath);
+    console.log(`[Cookies] Found at: ${finalPath} (Size: ${stats.size} bytes)`);
+    return ['--cookies', finalPath];
   }
+  console.warn('[Cookies] File NOT found! yt-dlp will run without authentication.');
   return [];
 };
 
@@ -34,8 +41,8 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
       '--no-playlist',
       '--ignore-errors',
       '--no-warnings',
-      '--extractor-args', 'youtube:player_client=web',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      '--extractor-args', 'youtube:player_client=ios',
+      '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
       ...getCookiesArg(),
     ];
 
