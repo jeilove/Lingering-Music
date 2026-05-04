@@ -253,24 +253,33 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
       console.log(`[Download] Requesting MP3 conversion from Cobalt API for videoId: ${videoId}`);
 
       // Cobalt API를 사용하여 유튜브 비디오를 MP3로 변환 및 프록시 다운로드 링크 획득
-      const cobaltRes = await axios.post('https://api.cobalt.tools/api/json', {
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        isAudioOnly: true,
-        aFormat: 'mp3'
-      }, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: 20000
-      });
+      let downloadUrl = '';
+      try {
+        const cobaltRes = await axios.post('https://api.cobalt.tools/', {
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          isAudioOnly: true,
+          aFormat: 'mp3'
+        }, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+            'Origin': 'https://cobalt.tools',
+            'Referer': 'https://cobalt.tools/'
+          },
+          timeout: 20000
+        });
 
-      if (!cobaltRes.data || !cobaltRes.data.url) {
-        throw new Error('Cobalt API failed to return a valid download URL');
+        if (cobaltRes.data && cobaltRes.data.url) {
+          downloadUrl = cobaltRes.data.url;
+          console.log(`[Download] Cobalt API success! Fetching stream...`);
+        } else {
+          throw new Error('Cobalt API failed to return a valid download URL');
+        }
+      } catch (cobaltErr: any) {
+        console.error(`[Cobalt API Error]:`, cobaltErr.response?.data || cobaltErr.message);
+        throw new Error(`Cobalt API Error: ${JSON.stringify(cobaltErr.response?.data || cobaltErr.message)}`);
       }
-
-      const downloadUrl = cobaltRes.data.url;
-      console.log(`[Download] Cobalt API success! Fetching stream...`);
 
       // Cobalt가 제공한 MP3 URL의 스트림을 가져와 클라이언트에게 전달
       const audioStreamResponse = await axios({
