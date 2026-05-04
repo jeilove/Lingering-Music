@@ -11,15 +11,18 @@ import { Schemas, validateQuery } from '../schemas';
 const router: ExpressRouter = Router();
 
 // ============================================
-// Piped API 인스턴스 (여러 개 = 하나 죽어도 다른 걸로 전환)
+// Piped/Invidious API 인스턴스 (실시간 확인된 살아있는 것들만)
 // ============================================
 const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.adminforge.de',
-  'https://api.piped.projectsegfault.com',
+  'https://api.piped.private.coffee',
 ];
 
-// Piped API에 요청을 보내는 헬퍼 (실패 시 다음 인스턴스로 자동 전환)
+const INVIDIOUS_INSTANCES = [
+  'https://inv.thepixora.com',
+  'https://inv.nadeko.net',
+];
+
+// Piped API 요청 헬퍼
 async function pipedFetch(endpoint: string): Promise<any> {
   for (const instance of PIPED_INSTANCES) {
     try {
@@ -29,61 +32,92 @@ async function pipedFetch(endpoint: string): Promise<any> {
       return res.data;
     } catch (err: any) {
       console.warn(`[Piped] ${instance} failed: ${err.message}`);
-      continue;
     }
   }
-  throw new Error('All Piped instances failed');
+  return null; // null이면 Invidious로 폴백
 }
 
-// Piped API에서 최적의 오디오 스트림 URL을 추출
+// Invidious API 요청 헬퍼
+async function invidiousFetch(endpoint: string): Promise<any> {
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const url = `${instance}/api/v1${endpoint}`;
+      console.log(`[Invidious] Trying: ${url}`);
+      const res = await axios.get(url, { timeout: 10000 });
+      return res.data;
+    } catch (err: any) {
+      console.warn(`[Invidious] ${instance} failed: ${err.message}`);
+    }
+  }
+  return null;
+}
+
+// 오디오 스트림 URL 추출 (Piped 우선 → Invidious 폴백)
 async function getAudioUrlFromPiped(videoId: string): Promise<string> {
   const cacheKey = `piped:audio:${videoId}`;
   const cached = cache.get(cacheKey);
   if (cached) {
-    console.log(`[Piped] Cache hit for audio: ${videoId}`);
+    console.log(`[Audio] Cache hit: ${videoId}`);
     return cached as string;
   }
 
-  const data = await pipedFetch(`/streams/${videoId}`);
-  const audioStreams = data.audioStreams || [];
-  
-  if (audioStreams.length === 0) {
-    throw new Error(`No audio streams found for video: ${videoId}`);
+  // 1차: Piped API 시도
+  const pipedData = await pipedFetch(`/streams/${videoId}`);
+  if (pipedData && pipedData.audioStreams && pipedData.audioStreams.length > 0) {
+    const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+    console.log(`[Piped] Audio found: ${bestAudio.quality || bestAudio.bitrate}kbps`);
+    cache.set(cacheKey, bestAudio.url, 300);
+    return bestAudio.url;
   }
 
-  // 비트레이트 기준으로 가장 좋은 오디오 스트림 선택
-  const bestAudio = audioStreams.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-  const audioUrl = bestAudio.url;
-  
-  console.log(`[Piped] Best audio: ${bestAudio.quality || bestAudio.bitrate}kbps, format: ${bestAudio.format || bestAudio.mimeType}`);
+  // 2차: Invidious API 시도
+  console.log(`[Audio] Piped failed, trying Invidious for: ${videoId}`);
+  const invData = await invidiousFetch(`/videos/${videoId}`);
+  if (invData && invData.adaptiveFormats) {
+    const audioFormats = invData.adaptiveFormats.filter((f: any) => f.type?.startsWith('audio/'));
+    if (audioFormats.length > 0) {
+      const bestAudio = audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+      console.log(`[Invidious] Audio found: ${bestAudio.bitrate}bps`);
+      cache.set(cacheKey, bestAudio.url, 300);
+      return bestAudio.url;
+    }
+  }
 
-  // 5분 동안 캐시 (유튜브 임시 URL의 유효시간 고려)
-  cache.set(cacheKey, audioUrl, 300);
-  return audioUrl;
+  throw new Error(`No audio streams found for video: ${videoId}`);
 }
 
-// Piped API로 유튜브 검색 → videoId 찾기
+// Piped/Invidious로 유튜브 검색 → videoId 찾기
 async function searchYouTubeViaPiped(query: string): Promise<string | null> {
+  // 1차: Piped 검색
   try {
     const data = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=music_songs`);
-    const items = data.items || [];
-    
-    if (items.length === 0) {
-      // music_songs 필터로 안 나오면 일반 검색
-      const fallback = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=videos`);
-      const fallbackItems = fallback.items || [];
-      if (fallbackItems.length === 0) return null;
-      // URL에서 videoId 추출 (/watch?v=XXXX)
-      const url = fallbackItems[0].url || '';
+    if (data && data.items && data.items.length > 0) {
+      const url = data.items[0].url || '';
+      const videoId = url.replace('/watch?v=', '');
+      if (videoId) return videoId;
+    }
+    // music_songs 필터 실패 시 일반 검색
+    const fallback = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=videos`);
+    if (fallback && fallback.items && fallback.items.length > 0) {
+      const url = fallback.items[0].url || '';
       return url.replace('/watch?v=', '') || null;
     }
-    
-    const url = items[0].url || '';
-    return url.replace('/watch?v=', '') || null;
   } catch (err: any) {
-    console.error(`[Piped Search] Failed: ${err.message}`);
-    return null;
+    console.warn(`[Piped Search] Failed: ${err.message}`);
   }
+
+  // 2차: Invidious 검색
+  try {
+    console.log(`[Search] Piped search failed, trying Invidious...`);
+    const data = await invidiousFetch(`/search?q=${encodeURIComponent(query)}&type=video`);
+    if (data && data.length > 0) {
+      return data[0].videoId || null;
+    }
+  } catch (err: any) {
+    console.warn(`[Invidious Search] Failed: ${err.message}`);
+  }
+
+  return null;
 }
 
 // ============================================
