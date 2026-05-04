@@ -2,186 +2,48 @@ import { Track } from '@music-player/shared';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001/api';
 
-// Piped/Invidious 인스턴스 (프론트엔드에서 직접 호출 가능한 CORS 허용 인스턴스들)
-const PIPED_INSTANCES = [
-  'https://api.piped.private.coffee',
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.recloud.it',
-  'https://pipedapi.lunar.icu',
-  'https://piped-api.garudalinux.org',
-];
-
-const INVIDIOUS_INSTANCES = [
-  'https://inv.thepixora.com',
-  'https://inv.nadeko.net',
-  'https://invidious.nerdvpn.de',
-];
-
-// Piped API 요청 클라이언트 헬퍼
-async function pipedFetch(endpoint: string): Promise<any> {
-  for (const instance of PIPED_INSTANCES) {
-    try {
-      const url = `${instance}${endpoint}`;
-      console.log(`[Client-Piped] Trying: ${url}`);
-      // 타임아웃을 15초로 늘림 (일부 인스턴스는 느림)
-      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      if (res.ok) return await res.json();
-    } catch (err: any) {
-      console.warn(`[Client-Piped] ${instance} failed: ${err.message}`);
-    }
-  }
-  return null;
-}
-
-// Invidious API 요청 클라이언트 헬퍼
-async function invidiousFetch(endpoint: string): Promise<any> {
-  for (const instance of INVIDIOUS_INSTANCES) {
-    try {
-      const url = `${instance}/api/v1${endpoint}`;
-      console.log(`[Client-Invidious] Trying: ${url}`);
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) return await res.json();
-    } catch (err: any) {
-      console.warn(`[Client-Invidious] ${instance} failed: ${err.message}`);
-    }
-  }
-  return null;
-}
-
-// 클라이언트에서 직접 유튜브 비디오 ID 찾기
-async function searchVideoIdOnClient(query: string): Promise<string | null> {
-  try {
-    // 1. Piped 검색 시도
-    const data = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=music_songs`);
-    if (data?.items?.length > 0) {
-      const url = data.items[0].url || '';
-      const match = url.match(/[?&]v=([^&]+)/) || url.match(/\/watch\?v=([^&]+)/);
-      return match ? match[1] : url.replace('/watch?v=', '');
-    }
-    // 2. Invidious 검색 시도
-    const invData = await invidiousFetch(`/search?q=${encodeURIComponent(query)}&type=video`);
-    if (invData?.length > 0) {
-      return invData[0].videoId || null;
-    }
-  } catch (err) {
-    console.error('[Client-Search] Failed:', err);
-  }
-  return null;
-}
-
 export async function searchMusic(query: string): Promise<Track[]> {
   if (!query) return [];
   try {
-    // 우선 서버 검색 시도 (서버는 DB나 다양한 검색 엔진을 활용할 수 있음)
     const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`);
-    if (response.ok) {
-      const data = await response.json();
-      return data.tracks || [];
-    }
+    if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+    const data = await response.json();
+    return data.tracks || [];
   } catch (error) {
     console.error('Error searching music:', error);
+    return [];
   }
-  return [];
 }
 
 export async function searchMusicYT(query: string): Promise<Track[]> {
   if (!query) return [];
   try {
-    // 유튜브 검색은 클라이언트에서 직접 수행 (서버 차단 방지)
-    console.log(`[Client-YT-Search] Searching for: ${query}`);
-    const data = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=music_songs`);
-    if (data?.items) {
-      return data.items.map((item: any) => ({
-        id: `yt_${item.url.split('v=')[1] || item.url.split('/').pop()}`,
-        title: item.title,
-        artist: item.uploaderName || 'Unknown Artist',
-        thumbnail: item.thumbnail,
-        duration: item.duration,
-        source: 'youtube'
-      }));
-    }
-  } catch (error) {
-    console.error('Error searching music on YT (Client):', error);
-  }
-  
-  // 클라이언트 검색 실패 시 서버로 폴백
-  try {
     const response = await fetch(`${API_BASE_URL}/yt-search?q=${encodeURIComponent(query)}`);
-    if (response.ok) {
-      const data = await response.json();
-      return data.tracks || [];
-    }
-  } catch (err) {}
-  
-  return [];
+    if (!response.ok) throw new Error(`YT Search failed: ${response.status}`);
+    const data = await response.json();
+    return data.tracks || [];
+  } catch (error) {
+    console.error('Error searching music on YT:', error);
+    return [];
+  }
 }
 
 export async function getStreamUrl(title: string, artist: string, id?: string): Promise<string | null> {
-  console.log(`[getStreamUrl-Client] Processing: ${title} (${id})`);
-  
-  try {
-    let videoId = '';
-    if (id && id.startsWith('yt_')) {
-      videoId = id.replace('yt_', '');
-    } else {
-      const foundId = await searchVideoIdOnClient(`${artist} - ${title}`);
-      if (!foundId) throw new Error('Video ID not found on client');
-      videoId = foundId;
-    }
-
-    // 1. 클라이언트에서 직접 스트림 추출 시도 (가장 빠르고 IP 차단 없음)
-    console.log(`[getStreamUrl-Client] Extracting stream for: ${videoId}`);
-    const pipedData = await pipedFetch(`/streams/${videoId}`);
-    
-    if (pipedData?.audioStreams?.length > 0) {
-      const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => {
-        const aIsMp4 = a.format === 'M4A' || (a.mimeType && a.mimeType.includes('mp4'));
-        const bIsMp4 = b.format === 'M4A' || (b.mimeType && b.mimeType.includes('mp4'));
-        if (aIsMp4 && !bIsMp4) return -1;
-        if (!aIsMp4 && bIsMp4) return 1;
-        return (b.bitrate || 0) - (a.bitrate || 0);
-      })[0];
-      
-      console.log(`[getStreamUrl-Client] Success via Piped!`);
-      // IP 바인딩 문제를 피하기 위해 프록시 URL이 있으면 우선 사용
-      return bestAudio.proxyUrl || bestAudio.url;
-    }
-
-    // 2. Invidious로 시도
-    const invData = await invidiousFetch(`/videos/${videoId}`);
-    if (invData?.adaptiveFormats) {
-      const bestAudio = invData.adaptiveFormats
-        .filter((f: any) => f.type?.includes('audio/'))
-        .sort((a: any, b: any) => {
-          const aIsMp4 = a.type?.includes('mp4');
-          const bIsMp4 = b.type?.includes('mp4');
-          if (aIsMp4 && !bIsMp4) return -1;
-          if (!aIsMp4 && bIsMp4) return 1;
-          return (b.bitrate || 0) - (a.bitrate || 0);
-        })[0];
-      if (bestAudio) {
-        console.log(`[getStreamUrl-Client] Success via Invidious!`);
-        return bestAudio.url;
-      }
-    }
-  } catch (error) {
-    console.warn('[getStreamUrl-Client] Failed, falling back to server:', error);
-  }
-
-  // 클라이언트 추출 실패 시 서버로 최종 폴백
   try {
     const params = new URLSearchParams({ title, artist });
     if (id) params.append('id', id);
-    const response = await fetch(`${API_BASE_URL}/stream-url?${params.toString()}`);
-    if (response.ok) {
-      const data = await response.json();
-      return data.url;
-    }
+    
+    const url = `${API_BASE_URL}/stream-url?${params.toString()}`;
+    console.log(`[getStreamUrl] Fetching: ${url}`);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch stream URL');
+    
+    const data = await response.json();
+    return data.url;
   } catch (error) {
-    console.error('Stream URL final error:', error);
+    console.error('Stream URL error:', error);
+    return null;
   }
-  
-  return null;
 }
 
 export interface LyricsData {

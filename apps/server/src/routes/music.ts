@@ -92,8 +92,10 @@ async function getAudioUrlFromPiped(videoId: string): Promise<string> {
     })[0];
     
     console.log(`[Piped] Audio found: ${bestAudio.quality || bestAudio.bitrate}kbps, format: ${bestAudio.format || bestAudio.mimeType}`);
-    cache.set(cacheKey, bestAudio.url, 300);
-    return bestAudio.url;
+    // IP 바인딩 문제를 피하기 위해 프록시 URL이 있으면 우선 사용
+    const finalUrl = bestAudio.proxyUrl || bestAudio.url;
+    cache.set(cacheKey, finalUrl, 300);
+    return finalUrl;
   }
 
   // 2차: Invidious API 시도
