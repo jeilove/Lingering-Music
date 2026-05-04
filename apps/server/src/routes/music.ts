@@ -243,7 +243,6 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
       // --- 프로덕션(Render) 환경: Piped(검색) + yt-dlp(다운로드) 조합 ---
       console.log(`[Download] Production environment detected. Using Piped(Search) + yt-dlp(Download) for: ${filename}`);
       
-      // 1. Piped API를 통해 검색어에 대한 정확한 videoId 획득 (ytsearch 봇 차단 우회)
       const searchQuery = `${artist} - ${title}`;
       const videoId = await searchYouTubeViaPiped(searchQuery);
       
@@ -253,10 +252,6 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
 
       console.log(`[Download] Found videoId: ${videoId}. Starting yt-dlp download...`);
 
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
-
-      // 2. 정확한 URL을 yt-dlp에 전달하여 다운로드 및 변환 (검색은 안 하지만 다운로드는 우회 가능성 높음)
       const targetUrl = `https://www.youtube.com/watch?v=${videoId}`;
       
       const args = [
@@ -267,16 +262,26 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
         '--audio-quality', '0',
         '-o', '-',
         '--no-playlist',
-        ...getCookiesArg(),
+        // 쿠키 없이 iOS 클라이언트로 우회하여 봇 차단 방지
+        '--extractor-args', 'youtube:player_client=ios,web',
       ];
 
       const downloader = spawn(config.ytdlpPath, args);
+      let errorLog = '';
+
+      // 첫 데이터가 들어올 때까지 헤더 전송을 미룸 (0바이트 파일 다운로드 방지)
+      downloader.stdout.once('data', () => {
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'audio/mpeg');
+          res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+        }
+      });
 
       downloader.stdout.pipe(res);
 
       downloader.stderr.on('data', (data) => {
         const msg = data.toString().trim();
-        // 콘솔 도배 방지를 위해 에러나 주요 정보만 로깅
+        errorLog += msg + '\n';
         if (msg && (msg.includes('ERROR') || msg.includes('WARNING'))) {
           console.error(`[Download yt-dlp]: ${msg}`);
         }
@@ -284,13 +289,23 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
 
       downloader.on('error', (err) => {
         console.error(`[Download yt-dlp spawn error]:`, err);
-        if (!res.headersSent) res.status(500).end();
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to start download process', details: err.message });
+        }
       });
 
       downloader.on('close', (code) => {
         if (code !== 0) {
           console.error(`[Download] yt-dlp exited with code ${code}`);
-          if (!res.headersSent) res.status(500).end();
+          if (!res.headersSent) {
+            // 헤더가 안 보내졌다는 건 stdout 출력이 아예 없었다는 뜻 (0바이트 방지됨)
+            res.status(500).json({ 
+              error: 'Failed to download track', 
+              details: errorLog.substring(0, 500) || 'Unknown yt-dlp error'
+            });
+          } else {
+            res.end(); // 이미 스트리밍 중 에러가 났다면 종료
+          }
         } else {
           console.log(`[Download] Successfully converted: ${filename}`);
         }
