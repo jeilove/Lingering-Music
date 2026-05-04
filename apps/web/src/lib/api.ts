@@ -86,7 +86,7 @@ export async function downloadTrack(track: Track): Promise<void> {
       window.location.assign(`${API_BASE_URL}/download?${params.toString()}`);
     } else {
       console.log(`[Download] Production environment detected. Redirecting to external downloader...`);
-      alert(`온라인(Render) 환경에서는 구글 봇 차단 및 브라우저 다운로드 차단을 우회하기 위해, 무료/무광고 외부 다운로드 사이트(Dirpy)로 연결해 드립니다.\n\n새 창이 열리면 화면 우측 하단의 [Record Audio] 버튼을 눌러 mp3로 저장해 주세요.`);
+      alert(`크롬 등 브라우저 보안 정책으로 인해 직접 다운로드가 차단되었습니다.\n가장 안전하고 광고가 없는 외부 사이트(Dirpy)를 통해 다운로드를 진행합니다.\n\n다음 화면에서 나오는 '유튜브 주소'를 복사(Ctrl+C)한 뒤, 열리는 사이트 검색창에 붙여넣기(Ctrl+V) 해주세요.`);
       
       const params = new URLSearchParams({ title: track.title, artist: track.artist });
       const res = await fetch(`${API_BASE_URL}/stream-url?${params.toString()}`);
@@ -96,8 +96,9 @@ export async function downloadTrack(track: Track): Promise<void> {
       
       const data = await res.json();
       if (data.videoId) {
-        const targetUrl = `https://dirpy.com/studio?url=https://www.youtube.com/watch?v=${data.videoId}`;
-        window.open(targetUrl, '_blank');
+        const targetUrl = `https://www.youtube.com/watch?v=${data.videoId}`;
+        prompt(`아래 주소를 복사(Ctrl+C)한 뒤, 확인을 누르면 열리는 사이트(dirpy)에 붙여넣기 하세요.`, targetUrl);
+        window.open('https://dirpy.com/', '_blank');
       } else {
         throw new Error('No video ID returned');
       }
