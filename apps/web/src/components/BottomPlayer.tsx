@@ -125,7 +125,7 @@ export function BottomPlayer() {
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           )}
-          {currentTrack.coverUrl && currentTrack.coverUrl !== 'NA' ? (
+          {currentTrack.coverUrl && currentTrack.coverUrl !== 'NA' && !currentTrack.coverUrl.startsWith('/') ? (
             <img 
               src={currentTrack.coverUrl} 
               alt={currentTrack.title} 

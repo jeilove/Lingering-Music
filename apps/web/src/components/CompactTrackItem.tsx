@@ -28,7 +28,7 @@ export function CompactTrackItem({ track, onClick, active, accentColor = 'primar
       )}
     >
       <div className="w-8 h-8 rounded-lg overflow-hidden glass-card flex-shrink-0 relative bg-white/5">
-        {track.coverUrl && !imageError ? (
+        {track.coverUrl && track.coverUrl !== 'NA' && !track.coverUrl.startsWith('/') && !imageError ? (
           <img 
             src={track.coverUrl} 
             alt={track.title} 
