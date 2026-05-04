@@ -52,6 +52,7 @@ COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/server/package.json ./apps/server/
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/prisma ./prisma
+COPY apps/server/cookies.txt ./apps/server/cookies.txt
 
 # Set environment variables
 ENV NODE_ENV=production

@@ -1,0 +1,39 @@
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.youtube.com	TRUE	/	TRUE	1812435468	PREF	f6=40000000&f7=4140&tz=Asia.Seoul&f5=30000
+www.youtube.com	FALSE	/	FALSE	1800355824	ytlmpromo_rating	1
+www.youtube.com	FALSE	/	FALSE	1804298016	namejan_2022_update_limit	1
+www.youtube.com	FALSE	/	FALSE	1804298017	namerewiews_popup_pl_limit	1
+www.youtube.com	FALSE	/	FALSE	1804298033	namerewiews_popup_pl	1
+www.youtube.com	FALSE	/	FALSE	1804298066	namejan_2022_update	1
+www.youtube.com	FALSE	/	FALSE	1804980971	namerewiews_popup_limit	1
+www.youtube.com	FALSE	/	FALSE	1804980989	namerewiews_popup	1
+www.youtube.com	FALSE	/	FALSE	1805508621	namenovember_2021_update	1
+www.youtube.com	FALSE	/	FALSE	1806140200	namesn_2022_limit	1
+www.youtube.com	FALSE	/	FALSE	1806140224	namesn_2022	1
+www.youtube.com	FALSE	/	FALSE	1806830648	namej24_limit	1
+www.youtube.com	FALSE	/	FALSE	1806830675	namej24	1
+.youtube.com	TRUE	/	TRUE	1791155315	__Secure-BUCKET	CKkF
+www.youtube.com	FALSE	/	FALSE	1783407111	ysm-pro-1	4
+www.youtube.com	FALSE	/	FALSE	1778195604	ysm-open-channel	1
+www.youtube.com	FALSE	/	FALSE	1777892901	ytlm-render	943
+www.youtube.com	FALSE	/	FALSE	1777936103	ypm-render	1
+www.youtube.com	FALSE	/	FALSE	1777936112	ypm-subsc-ext	1
+.youtube.com	TRUE	/	TRUE	1777877257	GPS	1
+.youtube.com	TRUE	/	TRUE	1812435459	__Secure-3PAPISID	B64LGP2f9iNJdh_s/Alf45p4QTvHLj1DQ2
+.youtube.com	TRUE	/	TRUE	1812435459	__Secure-3PSID	g.a0009gjLi8ef8LSoyNZWD45fwFAU1kljcDDH9EgB1ZYO0ekvdiCcAa873V9B94FHKzlq6bVnLQACgYKAX4SARISFQHGX2Miswm-XBZkB6XhkSp6umS54xoVAUF8yKriThyHaWK_y_WI4DaHiV3Y0076
+.youtube.com	TRUE	/	TRUE	1777875582	YTSESSION-98epo9	ANPz9KjLpe+aP5o8taxPaPe/nsiePumOtkGzT+ndxKuscif7pQq5iE42hMV30Qvlc9V2bVJGH5y8TO5zjdFP5Rkp5c5bG8HSDXw=
+.youtube.com	TRUE	/	TRUE	1812435464	LOGIN_INFO	AFmmF2swRQIhAKxbe6xUjkqgmnKTYlpXRvr6rFI9onjiTDojZqUPG7AxAiAG9DKf1m8Guky55Me48sxpsO2moDMHKiXyFbgQ-6EJ_w:QUQ3MjNmeF8tMUpPdTZUVGZiNDdNSHkxN0pwdFBpcVVYUk9TaUZDMGN4RlA0LVZQeGpzOVNtQ2RsTUpMd3NJR1RfZkg0X1EyOEZXNUwtd25KQTMyRUkyNHNWUkNuWmxkRy16ZzVRajlBTnhmY0E1LWVfSGFLR1dCQ1VzVDRXVTJuSWV0WThpNVdsTUwxWktzOGNKeUc5QUVFN3JIb3FwbVFn
+.youtube.com	TRUE	/	TRUE	1777875584	YTSESSION-ezj5d1	ANPz9KhtLLDFJDM2XCKlSavNL5kXXKRNdgSD8viD5227nz8p+5YCHS7rtZlzo1YhHSf+YhBSfyxxC8fgoRAK5O1J2Qbf1P7Nryk=
+www.youtube.com	FALSE	/	FALSE	1777879075	ysm-rss-block	1
+www.youtube.com	FALSE	/	FALSE	1777961875	ysm-rss_rate_block	1
+www.youtube.com	FALSE	/	FALSE	1777961877	ysm-main-render	1
+.youtube.com	TRUE	/	TRUE	1809411531	__Secure-1PSIDTS	sidts-CjQBhkeRd-eMMCqZ8ZW1ITLHl27VP-bzCjqUZ4nB3PnO4uU6B1ypyxajEb6dnJoOQqLOeTLbEAA
+.youtube.com	TRUE	/	TRUE	1809411531	__Secure-3PSIDTS	sidts-CjQBhkeRd-eMMCqZ8ZW1ITLHl27VP-bzCjqUZ4nB3PnO4uU6B1ypyxajEb6dnJoOQqLOeTLbEAA
+.youtube.com	TRUE	/	TRUE	1809411531	__Secure-3PSIDCC	AKEyXzWkjkUKEjFvoN8D0h1s3Jbs614wFJcJ4nhXKgQptpp_WRYOAHxqXtkqCk2Evztx8DAk1w
+.youtube.com	TRUE	/	TRUE	1793427477	VISITOR_PRIVACY_METADATA	CgJLUhIEGgAgHw%3D%3D
+.youtube.com	TRUE	/	TRUE	1793427477	VISITOR_INFO1_LIVE	a-uEyG8ERCE
+.youtube.com	TRUE	/	TRUE	0	YSC	F2mr2VAt7Do
+.youtube.com	TRUE	/	TRUE	1793424654	__Secure-ROLLOUT_TOKEN	CNepxMa3m-OR2AEQmbe3qv_pigMYovqJ4POelAM%3D

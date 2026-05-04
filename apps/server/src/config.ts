@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import os from 'os';
+import fs from 'fs';
 dotenv.config();
 
 const isWindows = os.platform() === 'win32';
@@ -15,4 +16,7 @@ export const config = {
   ytdlpPath: process.env.YTDLP_PATH || (isWindows ? path.resolve(process.cwd(), '../../.venv/Scripts/yt-dlp.exe') : '/usr/local/bin/yt-dlp'),
   mbUserAgent: process.env.MB_USER_AGENT || 'VibeMusicPlayer/1.0.0',
   baseUrl: process.env.BASE_URL || 'https://lingering-music.onrender.com',
+  cookiesPath: fs.existsSync(path.resolve(process.cwd(), 'apps/server/cookies.txt')) 
+    ? path.resolve(process.cwd(), 'apps/server/cookies.txt')
+    : path.resolve(process.cwd(), 'cookies.txt'),
 } as const;

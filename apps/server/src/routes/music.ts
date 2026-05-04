@@ -2,11 +2,20 @@ import { Router, type Router as ExpressRouter } from 'express';
 import axios from 'axios';
 import { execFile, spawn } from 'child_process';
 import type { Track } from '@music-player/shared';
+import fs from 'fs';
 import { cache } from '../cache';
 import { config } from '../config';
 import { Schemas, validateQuery } from '../schemas';
 
 const router: ExpressRouter = Router();
+
+// Helper to get cookies arg if file exists
+const getCookiesArg = () => {
+  if (fs.existsSync(config.cookiesPath)) {
+    return ['--cookies', config.cookiesPath];
+  }
+  return [];
+};
 
 router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res) => {
   const { title, artist, id: trackId } = req.query as { title: string; artist: string; id?: string };
@@ -27,6 +36,7 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
       '--no-warnings',
       '--extractor-args', 'youtube:player_client=android,web',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      ...getCookiesArg(),
     ];
 
     if (trackId && trackId.startsWith('yt_')) {
@@ -88,6 +98,7 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
       '--format', 'bestaudio',
       '--no-playlist',
       '--ignore-errors',
+      ...getCookiesArg(),
     ];
 
     const { stdout: cleanUrl } = await new Promise<{ stdout: string }>((resolve, reject) => {
@@ -195,6 +206,7 @@ router.get('/yt-search', validateQuery(Schemas.searchQuery), async (req, res) =>
       '--ignore-errors',
       '--quiet',
       '--no-warnings',
+      ...getCookiesArg(),
     ];
 
     const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
