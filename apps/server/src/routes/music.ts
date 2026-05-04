@@ -3,6 +3,7 @@ import axios from 'axios';
 import { execFile, spawn } from 'child_process';
 import type { Track } from '@music-player/shared';
 import fs from 'fs';
+import path from 'path';
 import { cache } from '../cache';
 import { config } from '../config';
 import { Schemas, validateQuery } from '../schemas';
