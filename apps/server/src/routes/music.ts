@@ -25,6 +25,62 @@ const getCookiesArg = () => {
   return [];
 };
 
+// ============================================
+// 진단용 엔드포인트: yt-dlp가 뭘 하고 있는지 100% 확인
+// ============================================
+router.get('/debug-stream', async (req, res) => {
+  const { id, title, artist } = req.query as { id?: string; title?: string; artist?: string };
+  
+  let target = '';
+  if (id && id.startsWith('yt_')) {
+    target = `https://www.youtube.com/watch?v=${id.replace('yt_', '')}`;
+  } else if (title && artist) {
+    target = `ytsearch1:${artist} - ${title}`;
+  } else {
+    return res.json({ error: 'id 또는 title+artist 필요' });
+  }
+
+  const cookiesArgs = getCookiesArg();
+  const args = [
+    target,
+    '--dump-json',          // 실제 다운로드 없이 정보만 출력
+    '--format', 'bestaudio/best',
+    '--no-playlist',
+    '--extractor-args', 'youtube:player_client=ios,web',
+    '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    '--referer', 'https://www.youtube.com/',
+    ...cookiesArgs,
+  ];
+
+  console.log(`[Debug] Running: ${config.ytdlpPath} ${args.join(' ')}`);
+
+  try {
+    const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
+      let stdout = '';
+      let stderr = '';
+      const proc = spawn(config.ytdlpPath, args);
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.on('close', (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+      // 30초 타임아웃
+      setTimeout(() => { proc.kill(); resolve({ stdout, stderr, code: -999 }); }, 30000);
+    });
+
+    res.json({
+      target,
+      ytdlpPath: config.ytdlpPath,
+      cookiesUsed: cookiesArgs.length > 0 ? cookiesArgs[1] : 'NONE',
+      exitCode: result.code,
+      stdoutLength: result.stdout.length,
+      stderrFull: result.stderr,
+      // stdout이 JSON이면 파싱, 아니면 앞 500자만
+      stdoutPreview: result.stdout.substring(0, 500),
+    });
+  } catch (err: any) {
+    res.json({ error: err.message });
+  }
+});
+
 router.get('/stream', async (req, res) => {
   const { id, title, artist } = req.query as { id?: string; title?: string; artist?: string };
   
@@ -48,10 +104,8 @@ router.get('/stream', async (req, res) => {
 
     const ytdlpArgs = [
       target,
-      '--format', 'bestaudio',
+      '--format', 'bestaudio/best',
       '--no-playlist',
-      '--ignore-errors',
-      '--no-warnings',
       '--extractor-args', 'youtube:player_client=ios,web',
       '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
       '--referer', 'https://www.youtube.com/',
@@ -62,43 +116,33 @@ router.get('/stream', async (req, res) => {
     // yt-dlp → ffmpeg(MP3 변환) → 브라우저 파이프라인
     const downloader = spawn(config.ytdlpPath, ytdlpArgs);
     const converter = spawn('ffmpeg', [
-      '-i', 'pipe:0',       // stdin에서 입력 받음
-      '-f', 'mp3',           // MP3 형식으로 출력
-      '-ab', '128k',         // 비트레이트 128kbps
-      '-v', 'error',         // 에러만 로그
-      'pipe:1',              // stdout으로 출력
+      '-i', 'pipe:0',
+      '-f', 'mp3',
+      '-ab', '128k',
+      '-v', 'error',
+      'pipe:1',
     ]);
 
-    // yt-dlp의 출력을 ffmpeg 입력으로 연결
     downloader.stdout.pipe(converter.stdin);
-    // ffmpeg의 MP3 출력을 브라우저로 전송
     converter.stdout.pipe(res);
 
+    // ★ 모든 stderr 출력을 로그로 남김 (에러 필터링 없이!)
     downloader.stderr.on('data', (data) => {
-      const msg = data.toString();
-      if (msg.includes('ERROR')) console.error(`[Stream Relay yt-dlp Error]: ${msg}`);
+      console.error(`[Stream Relay yt-dlp stderr]: ${data.toString().trim()}`);
     });
 
     converter.stderr.on('data', (data) => {
-      const msg = data.toString();
-      if (msg.includes('Error') || msg.includes('error')) {
-        console.error(`[Stream Relay ffmpeg Error]: ${msg}`);
-      }
+      console.error(`[Stream Relay ffmpeg stderr]: ${data.toString().trim()}`);
     });
 
     downloader.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`[Stream Relay] yt-dlp exited with code ${code}`);
-      }
-      // yt-dlp가 끝나면 ffmpeg 입력도 닫아줌
+      console.log(`[Stream Relay] yt-dlp exited with code ${code}`);
       converter.stdin.end();
     });
 
     converter.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`[Stream Relay] ffmpeg exited with code ${code}`);
-        if (!res.headersSent) res.status(500).end();
-      }
+      console.log(`[Stream Relay] ffmpeg exited with code ${code}`);
+      if (code !== 0 && !res.headersSent) res.status(500).end();
     });
 
     req.on('close', () => {
