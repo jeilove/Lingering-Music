@@ -29,6 +29,7 @@ router.get('/stream', async (req, res) => {
   const { id, title, artist } = req.query as { id?: string; title?: string; artist?: string };
   
   try {
+    // ID가 yt_로 시작하면 직접 유튜브 URL 사용, 아니면 검색
     let target = '';
     if (id && id.startsWith('yt_')) {
       target = `https://www.youtube.com/watch?v=${id.replace('yt_', '')}`;
@@ -40,11 +41,12 @@ router.get('/stream', async (req, res) => {
 
     console.log(`[Stream Relay] Starting stream for: ${target}`);
     
-    // Set proper headers for audio streaming
+    // 브라우저가 인식할 수 있는 MP3 형식으로 응답
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Accept-Ranges', 'none');
 
-    const args = [
+    const ytdlpArgs = [
       target,
       '--format', 'bestaudio',
       '--no-playlist',
@@ -53,29 +55,56 @@ router.get('/stream', async (req, res) => {
       '--extractor-args', 'youtube:player_client=ios,web',
       '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
       '--referer', 'https://www.youtube.com/',
-      '-o', '-', // Output to stdout
+      '-o', '-',
       ...getCookiesArg(),
     ];
 
-    const downloader = spawn(config.ytdlpPath, args);
+    // yt-dlp → ffmpeg(MP3 변환) → 브라우저 파이프라인
+    const downloader = spawn(config.ytdlpPath, ytdlpArgs);
+    const converter = spawn('ffmpeg', [
+      '-i', 'pipe:0',       // stdin에서 입력 받음
+      '-f', 'mp3',           // MP3 형식으로 출력
+      '-ab', '128k',         // 비트레이트 128kbps
+      '-v', 'error',         // 에러만 로그
+      'pipe:1',              // stdout으로 출력
+    ]);
 
-    downloader.stdout.pipe(res);
+    // yt-dlp의 출력을 ffmpeg 입력으로 연결
+    downloader.stdout.pipe(converter.stdin);
+    // ffmpeg의 MP3 출력을 브라우저로 전송
+    converter.stdout.pipe(res);
 
     downloader.stderr.on('data', (data) => {
       const msg = data.toString();
-      if (msg.includes('ERROR')) console.error(`[Stream Relay Error]: ${msg}`);
+      if (msg.includes('ERROR')) console.error(`[Stream Relay yt-dlp Error]: ${msg}`);
+    });
+
+    converter.stderr.on('data', (data) => {
+      const msg = data.toString();
+      if (msg.includes('Error') || msg.includes('error')) {
+        console.error(`[Stream Relay ffmpeg Error]: ${msg}`);
+      }
     });
 
     downloader.on('close', (code) => {
       if (code !== 0) {
         console.error(`[Stream Relay] yt-dlp exited with code ${code}`);
+      }
+      // yt-dlp가 끝나면 ffmpeg 입력도 닫아줌
+      converter.stdin.end();
+    });
+
+    converter.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`[Stream Relay] ffmpeg exited with code ${code}`);
         if (!res.headersSent) res.status(500).end();
       }
     });
 
     req.on('close', () => {
-      console.log(`[Stream Relay] Client disconnected, killing downloader.`);
+      console.log(`[Stream Relay] Client disconnected, cleaning up.`);
       downloader.kill();
+      converter.kill();
     });
   } catch (error: any) {
     console.error('[Stream Relay Exception]:', error.message);
