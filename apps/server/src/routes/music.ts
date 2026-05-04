@@ -10,225 +10,177 @@ import { Schemas, validateQuery } from '../schemas';
 
 const router: ExpressRouter = Router();
 
-// Helper to get cookies arg if file exists
-const getCookiesArg = () => {
-  const path1 = path.resolve(process.cwd(), 'apps/server/cookies.txt');
-  const path2 = path.resolve(process.cwd(), 'cookies.txt');
-  const finalPath = fs.existsSync(path1) ? path1 : (fs.existsSync(path2) ? path2 : null);
-
-  if (finalPath) {
-    const stats = fs.statSync(finalPath);
-    console.log(`[Cookies] Found at: ${finalPath} (Size: ${stats.size} bytes)`);
-    return ['--cookies', finalPath];
-  }
-  console.warn('[Cookies] File NOT found! yt-dlp will run without authentication.');
-  return [];
-};
-
 // ============================================
-// 진단용 엔드포인트: yt-dlp가 뭘 하고 있는지 100% 확인
+// Piped API 인스턴스 (여러 개 = 하나 죽어도 다른 걸로 전환)
 // ============================================
-router.get('/debug-stream', async (req, res) => {
-  const { id, title, artist } = req.query as { id?: string; title?: string; artist?: string };
-  
-  let target = '';
-  if (id && id.startsWith('yt_')) {
-    target = `https://www.youtube.com/watch?v=${id.replace('yt_', '')}`;
-  } else if (title && artist) {
-    target = `ytsearch1:${artist} - ${title}`;
-  } else {
-    return res.json({ error: 'id 또는 title+artist 필요' });
-  }
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://api.piped.projectsegfault.com',
+];
 
-  const cookiesArgs = getCookiesArg();
-  const args = [
-    target,
-    '--dump-json',          // 실제 다운로드 없이 정보만 출력
-    '--format', 'bestaudio/best',
-    '--no-playlist',
-    '--extractor-args', 'youtube:player_client=ios,web',
-    '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-    '--referer', 'https://www.youtube.com/',
-    ...cookiesArgs,
-  ];
-
-  console.log(`[Debug] Running: ${config.ytdlpPath} ${args.join(' ')}`);
-
-  try {
-    const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
-      let stdout = '';
-      let stderr = '';
-      const proc = spawn(config.ytdlpPath, args);
-      proc.stdout.on('data', (d) => { stdout += d.toString(); });
-      proc.stderr.on('data', (d) => { stderr += d.toString(); });
-      proc.on('close', (code) => resolve({ stdout, stderr, code: code ?? -1 }));
-      // 30초 타임아웃
-      setTimeout(() => { proc.kill(); resolve({ stdout, stderr, code: -999 }); }, 30000);
-    });
-
-    res.json({
-      target,
-      ytdlpPath: config.ytdlpPath,
-      cookiesUsed: cookiesArgs.length > 0 ? cookiesArgs[1] : 'NONE',
-      exitCode: result.code,
-      stdoutLength: result.stdout.length,
-      stderrFull: result.stderr,
-      // stdout이 JSON이면 파싱, 아니면 앞 500자만
-      stdoutPreview: result.stdout.substring(0, 500),
-    });
-  } catch (err: any) {
-    res.json({ error: err.message });
-  }
-});
-
-router.get('/stream', async (req, res) => {
-  const { id, title, artist } = req.query as { id?: string; title?: string; artist?: string };
-  
-  try {
-    // ID가 yt_로 시작하면 직접 유튜브 URL 사용, 아니면 검색
-    let target = '';
-    if (id && id.startsWith('yt_')) {
-      target = `https://www.youtube.com/watch?v=${id.replace('yt_', '')}`;
-    } else if (title && artist) {
-      target = `ytsearch1:${artist} - ${title}`;
-    } else {
-      return res.status(400).json({ error: 'Missing track identification' });
+// Piped API에 요청을 보내는 헬퍼 (실패 시 다음 인스턴스로 자동 전환)
+async function pipedFetch(endpoint: string): Promise<any> {
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const url = `${instance}${endpoint}`;
+      console.log(`[Piped] Trying: ${url}`);
+      const res = await axios.get(url, { timeout: 10000 });
+      return res.data;
+    } catch (err: any) {
+      console.warn(`[Piped] ${instance} failed: ${err.message}`);
+      continue;
     }
-
-    console.log(`[Stream Relay] Starting stream for: ${target}`);
-    
-    // 브라우저가 인식할 수 있는 MP3 형식으로 응답
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    res.setHeader('Accept-Ranges', 'none');
-
-    const ytdlpArgs = [
-      target,
-      '--format', 'bestaudio/best',
-      '--no-playlist',
-      '--extractor-args', 'youtube:player_client=ios,web',
-      '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-      '--referer', 'https://www.youtube.com/',
-      '-o', '-',
-      ...getCookiesArg(),
-    ];
-
-    // yt-dlp → ffmpeg(MP3 변환) → 브라우저 파이프라인
-    const downloader = spawn(config.ytdlpPath, ytdlpArgs);
-    const converter = spawn('ffmpeg', [
-      '-i', 'pipe:0',
-      '-f', 'mp3',
-      '-ab', '128k',
-      '-v', 'error',
-      'pipe:1',
-    ]);
-
-    downloader.stdout.pipe(converter.stdin);
-    converter.stdout.pipe(res);
-
-    // ★ 모든 stderr 출력을 로그로 남김 (에러 필터링 없이!)
-    downloader.stderr.on('data', (data) => {
-      console.error(`[Stream Relay yt-dlp stderr]: ${data.toString().trim()}`);
-    });
-
-    converter.stderr.on('data', (data) => {
-      console.error(`[Stream Relay ffmpeg stderr]: ${data.toString().trim()}`);
-    });
-
-    downloader.on('close', (code) => {
-      console.log(`[Stream Relay] yt-dlp exited with code ${code}`);
-      converter.stdin.end();
-    });
-
-    converter.on('close', (code) => {
-      console.log(`[Stream Relay] ffmpeg exited with code ${code}`);
-      if (code !== 0 && !res.headersSent) res.status(500).end();
-    });
-
-    req.on('close', () => {
-      console.log(`[Stream Relay] Client disconnected, cleaning up.`);
-      downloader.kill();
-      converter.kill();
-    });
-  } catch (error: any) {
-    console.error('[Stream Relay Exception]:', error.message);
-    if (!res.headersSent) res.status(500).json({ error: 'Streaming failed' });
   }
-});
+  throw new Error('All Piped instances failed');
+}
 
+// Piped API에서 최적의 오디오 스트림 URL을 추출
+async function getAudioUrlFromPiped(videoId: string): Promise<string> {
+  const cacheKey = `piped:audio:${videoId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    console.log(`[Piped] Cache hit for audio: ${videoId}`);
+    return cached as string;
+  }
+
+  const data = await pipedFetch(`/streams/${videoId}`);
+  const audioStreams = data.audioStreams || [];
+  
+  if (audioStreams.length === 0) {
+    throw new Error(`No audio streams found for video: ${videoId}`);
+  }
+
+  // 비트레이트 기준으로 가장 좋은 오디오 스트림 선택
+  const bestAudio = audioStreams.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+  const audioUrl = bestAudio.url;
+  
+  console.log(`[Piped] Best audio: ${bestAudio.quality || bestAudio.bitrate}kbps, format: ${bestAudio.format || bestAudio.mimeType}`);
+
+  // 5분 동안 캐시 (유튜브 임시 URL의 유효시간 고려)
+  cache.set(cacheKey, audioUrl, 300);
+  return audioUrl;
+}
+
+// Piped API로 유튜브 검색 → videoId 찾기
+async function searchYouTubeViaPiped(query: string): Promise<string | null> {
+  try {
+    const data = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=music_songs`);
+    const items = data.items || [];
+    
+    if (items.length === 0) {
+      // music_songs 필터로 안 나오면 일반 검색
+      const fallback = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=videos`);
+      const fallbackItems = fallback.items || [];
+      if (fallbackItems.length === 0) return null;
+      // URL에서 videoId 추출 (/watch?v=XXXX)
+      const url = fallbackItems[0].url || '';
+      return url.replace('/watch?v=', '') || null;
+    }
+    
+    const url = items[0].url || '';
+    return url.replace('/watch?v=', '') || null;
+  } catch (err: any) {
+    console.error(`[Piped Search] Failed: ${err.message}`);
+    return null;
+  }
+}
+
+// ============================================
+// API 엔드포인트: 스트리밍 URL 반환
+// ============================================
 router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res) => {
   const { title, artist, id: trackId } = req.query as { title: string; artist: string; id?: string };
-  
-  // Now we return our own STABLE relay URL instead of a fragile direct YouTube URL
-  const params = new URLSearchParams();
-  if (trackId) params.append('id', trackId);
-  if (title) params.append('title', title);
-  if (artist) params.append('artist', artist);
 
-  const relayUrl = `${config.baseUrl}/api/stream?${params.toString()}`;
-  console.log(`[Stream URL] Returning stable relay link: ${relayUrl}`);
-  
-  res.json({ url: relayUrl });
+  try {
+    let videoId = '';
+
+    // yt_ 접두사가 있으면 바로 유튜브 ID 사용
+    if (trackId && trackId.startsWith('yt_')) {
+      videoId = trackId.replace('yt_', '');
+    } else {
+      // MusicBrainz ID 등인 경우 → Piped 검색으로 유튜브 ID 찾기
+      const searchQuery = `${artist} - ${title}`;
+      console.log(`[Stream URL] Searching Piped for: "${searchQuery}"`);
+      const foundId = await searchYouTubeViaPiped(searchQuery);
+      if (!foundId) {
+        return res.status(404).json({ error: 'YouTube video not found' });
+      }
+      videoId = foundId;
+    }
+
+    console.log(`[Stream URL] Getting audio for videoId: ${videoId}`);
+    const audioUrl = await getAudioUrlFromPiped(videoId);
+    
+    console.log(`[Stream URL] Success! Audio URL length: ${audioUrl.length}`);
+    res.json({ url: audioUrl });
+  } catch (error: any) {
+    console.error('[Stream URL Exception]:', error.message);
+    res.status(500).json({ error: 'Failed to get stream URL', details: error.message });
+  }
 });
 
+// ============================================
+// API 엔드포인트: MP3 다운로드 (온라인: Piped + ffmpeg)
+// ============================================
 router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) => {
   const { title, artist } = req.query as { title: string; artist: string };
-
-  const keyword = `${artist} - ${title} official audio`;
   const filename = `${artist} - ${title}.mp3`;
 
   try {
-    const args = [
-      `ytsearch1:${keyword}`,
-      '--get-url',
-      '--format', 'bestaudio',
-      '--no-playlist',
-      '--ignore-errors',
-      ...getCookiesArg(),
-    ];
+    // 1. Piped로 유튜브 검색
+    const searchQuery = `${artist} - ${title}`;
+    console.log(`[Download] Searching Piped for: "${searchQuery}"`);
+    const videoId = await searchYouTubeViaPiped(searchQuery);
+    
+    if (!videoId) {
+      return res.status(404).json({ error: 'YouTube video not found for download' });
+    }
 
-    const { stdout: cleanUrl } = await new Promise<{ stdout: string }>((resolve, reject) => {
-      execFile(config.ytdlpPath, args, {
-        timeout: 30000,
-        encoding: 'utf8',
-        env: { ...process.env, PYTHONIOENCODING: 'utf8' },
-      }, (error: any, stdout: string) => {
-        if (error && !stdout) reject(error);
-        else resolve({ stdout: (stdout || '').trim() });
-      });
-    });
+    // 2. Piped에서 오디오 URL 가져오기
+    const audioUrl = await getAudioUrlFromPiped(videoId);
+    console.log(`[Download] Got audio URL, starting ffmpeg conversion...`);
 
-    if (!cleanUrl) throw new Error('Download URL not found');
-
+    // 3. ffmpeg로 MP3 변환하면서 브라우저로 전송
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
-    const downloader = spawn(config.ytdlpPath, [
-      cleanUrl,
-      '--ignore-errors',
-      '-x',
-      '--audio-format', 'mp3',
-      '--audio-quality', '0',
-      '-o', '-',
-      '--no-playlist',
+    const converter = spawn('ffmpeg', [
+      '-i', audioUrl,        // Piped에서 받은 오디오 URL을 직접 입력
+      '-f', 'mp3',           // MP3 형식
+      '-ab', '192k',         // 비트레이트 192kbps (다운로드는 고품질)
+      '-v', 'error',
+      'pipe:1',              // stdout으로 출력
     ]);
 
-    downloader.stdout.pipe(res);
+    converter.stdout.pipe(res);
 
-    downloader.on('close', (code) => {
+    converter.stderr.on('data', (data) => {
+      const msg = data.toString().trim();
+      if (msg) console.error(`[Download ffmpeg]: ${msg}`);
+    });
+
+    converter.on('close', (code) => {
       if (code !== 0) {
-        console.error(`yt-dlp download failed with code ${code}`);
+        console.error(`[Download] ffmpeg exited with code ${code}`);
         if (!res.headersSent) res.status(500).end();
+      } else {
+        console.log(`[Download] Successfully converted: ${filename}`);
       }
     });
 
-    req.on('close', () => downloader.kill());
+    req.on('close', () => {
+      converter.kill();
+    });
   } catch (error: any) {
-    console.error('Download error:', error.message);
+    console.error('[Download Exception]:', error.message);
     if (!res.headersSent) res.status(500).json({ error: 'Failed to download track' });
   }
 });
 
+// ============================================
+// API 엔드포인트: MusicBrainz 검색 (기존 유지)
+// ============================================
 router.get('/search', validateQuery(Schemas.searchQuery), async (req, res) => {
   const query = req.query.q as string;
 
@@ -270,6 +222,9 @@ router.get('/search', validateQuery(Schemas.searchQuery), async (req, res) => {
   }
 });
 
+// ============================================
+// API 엔드포인트: 유튜브 검색 (Piped API 사용)
+// ============================================
 router.get('/yt-search', validateQuery(Schemas.searchQuery), async (req, res) => {
   const query = req.query.q as string;
 
@@ -281,67 +236,47 @@ router.get('/yt-search', validateQuery(Schemas.searchQuery), async (req, res) =>
   }
 
   try {
-    const queryHex = Buffer.from(query).toString('hex');
-    console.log(`[YT Search] Fetching from YouTube: "${query}" (Hex: ${queryHex})`);
+    console.log(`[YT Search] Searching Piped for: "${query}"`);
 
-    const args = [
-      `ytsearch15:${query} music`,
-      '--flat-playlist',
-      '--print', '%(id)s\t%(title)s\t%(uploader)s\t%(duration)s\t%(thumbnail)s',
-      '--no-playlist',
-      '--ignore-errors',
-      '--quiet',
-      '--no-warnings',
-      ...getCookiesArg(),
-    ];
+    // Piped API로 검색
+    const data = await pipedFetch(`/search?q=${encodeURIComponent(query + ' music')}&filter=music_songs`);
+    let items = data.items || [];
+    
+    // music_songs에서 결과가 없으면 일반 검색
+    if (items.length === 0) {
+      const fallback = await pipedFetch(`/search?q=${encodeURIComponent(query + ' music')}&filter=videos`);
+      items = fallback.items || [];
+    }
 
-    const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      execFile(config.ytdlpPath, args, {
-        timeout: 20000,
-        encoding: 'utf8',
-        env: { ...process.env, PYTHONIOENCODING: 'utf8' },
-      }, (error: any, stdout: string, stderr: string) => {
-        if (error && !stdout) reject(error);
-        else resolve({ stdout: stdout.trim(), stderr });
-      });
-    });
-
-    if (stderr) console.warn('[YT Search Warning]:', stderr);
-
-    const tracks: Track[] = stdout.trim().split('\n')
-      .filter(l => l.trim())
-      .map(line => {
-        const parts = line.split('\t');
-        if (parts.length < 5) return null;
-        const [id, title, artist, duration, thumbnail] = parts;
-        if (id === 'NA') return null;
-
-        const validThumbnail = thumbnail && thumbnail !== 'NA'
-          ? thumbnail
-          : `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
-
+    const tracks: Track[] = items
+      .filter((item: any) => item.url && item.url.includes('/watch?v='))
+      .slice(0, 15)
+      .map((item: any) => {
+        const videoId = item.url.replace('/watch?v=', '');
         return {
-          id: `yt_${id}`,
-          title: title.replace(/Official (Audio|Video|Music Video)/gi, '').trim(),
-          artist: artist === 'NA' ? 'Unknown Artist' : artist,
+          id: `yt_${videoId}`,
+          title: (item.title || '').replace(/Official (Audio|Video|Music Video)/gi, '').trim(),
+          artist: item.uploaderName || item.uploader || 'Unknown Artist',
           album: 'YouTube Music',
-          duration: duration === 'NA' ? 0 : parseInt(duration) || 0,
-          coverUrl: validThumbnail,
+          duration: item.duration || 0,
+          coverUrl: item.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
           releaseYear: new Date().getFullYear().toString(),
           tags: [query.replace('#', '')],
         };
-      })
-      .filter(Boolean) as Track[];
+      });
 
     const result = { tracks };
     cache.set(cacheKey, result, 3600);
     res.json(result);
   } catch (error: any) {
-    console.error('YT Search error:', error.message);
+    console.error('[YT Search] Piped search error:', error.message);
     res.status(500).json({ error: 'Failed to search YouTube' });
   }
 });
 
+// ============================================
+// API 엔드포인트: 가사 검색 (기존 유지)
+// ============================================
 router.get('/lyrics', validateQuery(Schemas.lyricsQuery), async (req, res) => {
   const { title, artist, album, duration } = req.query as {
     title: string; artist: string; album?: string; duration?: string;
@@ -388,6 +323,45 @@ router.get('/lyrics', validateQuery(Schemas.lyricsQuery), async (req, res) => {
     }
     console.error('Lyrics fetch error:', error.message);
     res.status(500).json({ error: 'Failed to fetch lyrics' });
+  }
+});
+
+// ============================================
+// 진단용 엔드포인트 (디버깅용, 추후 삭제 가능)
+// ============================================
+router.get('/debug-stream', async (req, res) => {
+  const { id, title, artist } = req.query as { id?: string; title?: string; artist?: string };
+  
+  try {
+    let videoId = '';
+    if (id && id.startsWith('yt_')) {
+      videoId = id.replace('yt_', '');
+    } else if (title && artist) {
+      const found = await searchYouTubeViaPiped(`${artist} - ${title}`);
+      videoId = found || 'NOT_FOUND';
+    } else {
+      return res.json({ error: 'id 또는 title+artist 필요' });
+    }
+
+    const streamData = await pipedFetch(`/streams/${videoId}`);
+    const audioStreams = streamData.audioStreams || [];
+    
+    res.json({
+      videoId,
+      title: streamData.title,
+      uploader: streamData.uploader,
+      duration: streamData.duration,
+      audioStreamCount: audioStreams.length,
+      audioStreams: audioStreams.map((s: any) => ({
+        quality: s.quality,
+        bitrate: s.bitrate,
+        format: s.format,
+        mimeType: s.mimeType,
+        urlLength: s.url?.length,
+      })),
+    });
+  } catch (err: any) {
+    res.json({ error: err.message });
   }
 });
 
