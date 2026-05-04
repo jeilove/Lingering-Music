@@ -240,70 +240,61 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
       req.on('close', () => downloader.kill());
 
     } else {
-      // --- 프로덕션(Render) 환경: Piped + ffmpeg 방식 사용 ---
-      console.log(`[Download] Production environment detected. Using Piped+ffmpeg for: ${filename}`);
+      // --- 프로덕션(Render) 환경: Cobalt API 방식 사용 (403 차단 및 ffmpeg 부하 우회) ---
+      console.log(`[Download] Production environment detected. Using Cobalt API for: ${filename}`);
       
       const searchQuery = `${artist} - ${title}`;
       const videoId = await searchYouTubeViaPiped(searchQuery);
       
       if (!videoId) {
-        throw new Error('YouTube video not found for download via Piped');
+        throw new Error('YouTube video not found for download');
       }
 
-      const audioUrl = await getAudioUrlFromPiped(videoId);
-      console.log(`[Download] Got audio URL, fetching stream with axios...`);
+      console.log(`[Download] Requesting MP3 conversion from Cobalt API for videoId: ${videoId}`);
 
-      // Node.js(axios)로 직접 스트림을 받아서 ffmpeg에 넘겨줍니다 (ffmpeg 직접 다운로드 실패 방지)
-      const audioStreamResponse = await axios({
-        method: 'get',
-        url: audioUrl,
-        responseType: 'stream',
+      // Cobalt API를 사용하여 유튜브 비디오를 MP3로 변환 및 프록시 다운로드 링크 획득
+      const cobaltRes = await axios.post('https://api.cobalt.tools/api/json', {
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        isAudioOnly: true,
+        aFormat: 'mp3'
+      }, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Referer': 'https://www.youtube.com/'
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         },
-        timeout: 30000,
+        timeout: 20000
       });
 
-      console.log(`[Download] Stream fetched, starting ffmpeg conversion...`);
+      if (!cobaltRes.data || !cobaltRes.data.url) {
+        throw new Error('Cobalt API failed to return a valid download URL');
+      }
+
+      const downloadUrl = cobaltRes.data.url;
+      console.log(`[Download] Cobalt API success! Fetching stream...`);
+
+      // Cobalt가 제공한 MP3 URL의 스트림을 가져와 클라이언트에게 전달
+      const audioStreamResponse = await axios({
+        method: 'get',
+        url: downloadUrl,
+        responseType: 'stream',
+        timeout: 30000,
+      });
 
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
-      const converter = spawn('ffmpeg', [
-        '-i', 'pipe:0',      // axios 스트림을 stdin으로 받음
-        '-f', 'mp3',
-        '-ab', '192k',
-        '-v', 'error',
-        'pipe:1',            // 결과를 stdout으로 출력
-      ]);
+      audioStreamResponse.data.pipe(res);
 
-      // 파이프 연결: Axios 스트림 -> ffmpeg -> HTTP 응답
-      audioStreamResponse.data.pipe(converter.stdin);
-      converter.stdout.pipe(res);
-
-      converter.stderr.on('data', (data) => {
-        const msg = data.toString().trim();
-        if (msg) console.error(`[Download ffmpeg]: ${msg}`);
+      audioStreamResponse.data.on('end', () => {
+        console.log(`[Download] Successfully sent MP3 to client: ${filename}`);
       });
 
-      converter.on('error', (err) => {
-        console.error(`[Download ffmpeg spawn error]:`, err);
-        if (!res.headersSent) res.status(500).end();
-      });
-
-      converter.on('close', (code) => {
-        if (code !== 0) {
-          console.error(`[Download] ffmpeg exited with code ${code}`);
-          if (!res.headersSent) res.status(500).end();
-        } else {
-          console.log(`[Download] Successfully converted: ${filename}`);
-        }
+      audioStreamResponse.data.on('error', (err: any) => {
+        console.error(`[Download] Stream transmission error:`, err.message);
       });
 
       req.on('close', () => {
-        converter.kill();
-        audioStreamResponse.data.destroy(); // 연결 끊기면 다운로드 스트림도 종료
+        audioStreamResponse.data.destroy();
       });
     }
   } catch (error: any) {
