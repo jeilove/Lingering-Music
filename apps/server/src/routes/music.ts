@@ -251,20 +251,35 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
       }
 
       const audioUrl = await getAudioUrlFromPiped(videoId);
-      console.log(`[Download] Got audio URL, starting ffmpeg conversion...`);
+      console.log(`[Download] Got audio URL, fetching stream with axios...`);
+
+      // Node.js(axios)로 직접 스트림을 받아서 ffmpeg에 넘겨줍니다 (ffmpeg 직접 다운로드 실패 방지)
+      const audioStreamResponse = await axios({
+        method: 'get',
+        url: audioUrl,
+        responseType: 'stream',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Referer': 'https://www.youtube.com/'
+        },
+        timeout: 30000,
+      });
+
+      console.log(`[Download] Stream fetched, starting ffmpeg conversion...`);
 
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
       const converter = spawn('ffmpeg', [
-        '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        '-i', audioUrl,
+        '-i', 'pipe:0',      // axios 스트림을 stdin으로 받음
         '-f', 'mp3',
         '-ab', '192k',
         '-v', 'error',
-        'pipe:1',
+        'pipe:1',            // 결과를 stdout으로 출력
       ]);
 
+      // 파이프 연결: Axios 스트림 -> ffmpeg -> HTTP 응답
+      audioStreamResponse.data.pipe(converter.stdin);
       converter.stdout.pipe(res);
 
       converter.stderr.on('data', (data) => {
@@ -286,7 +301,10 @@ router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) =
         }
       });
 
-      req.on('close', () => converter.kill());
+      req.on('close', () => {
+        converter.kill();
+        audioStreamResponse.data.destroy(); // 연결 끊기면 다운로드 스트림도 종료
+      });
     }
   } catch (error: any) {
     console.error('[Download Exception]:', error.message);
