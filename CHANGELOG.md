@@ -1,17 +1,20 @@
 # CHANGELOG
 
+## [1.3.0] - 2026-05-04
+#### Added
+- **Piped API 기반 스트리밍 전환**: 잦은 구글 봇 차단(Sign in to confirm...) 및 쿠키 만료 문제를 근본적으로 해결하기 위해 스트리밍 및 검색의 핵심 엔진을 Piped API 기반으로 전면 교체했습니다.
+- **다중 인스턴스 폴백 시스템 (이중 안전장치)**: Piped API 실패 시 Invidious API로 즉각 우회하는 폴백 시스템을 구축하여 클라우드(Render) 환경에서도 끊김 없는 스트리밍 안정성을 확보했습니다.
+- **클라이언트 우회 다운로드(Hybrid Download)**: Render 데이터센터 IP의 강제 403 차단을 우회하기 위해, 로컬 환경에서는 서버 측 `yt-dlp`를, 온라인 환경에서는 클라이언트(사용자 거주지 IP)가 직접 스트림을 열어 봇 차단을 완벽히 회피하는 스마트 다운로드 전략을 적용했습니다.
+
+#### Fixed
+- **0바이트 다운로드 방어**: 백엔드 `yt-dlp` 실패 시 에러가 묻히고 0바이트 빈 파일이 다운로드되던 버그를 고치기 위해, 파이프라인에서 실제 데이터가 스트리밍되기 전까지 헤더 전송을 대기하도록 로직을 수정했습니다.
+- **iOS 클라이언트 우회 기법 적용**: `yt-dlp`에 `--extractor-args youtube:player_client=ios,web` 옵션을 추가하여 오디오 다운로드 시 발생하는 구글 봇 차단을 추가적으로 방어했습니다.
+- **미디어 포맷 충돌 해결 (MEDIA_ELEMENT_ERROR)**: 브라우저 환경에서 `webm` 형식 오디오가 재생 불가능한 오류를 해결하기 위해, `Piped/Invidious` 응답 필터에서 `m4a(audio/mp4)` 형식을 최우선 순위로 강제 선택하도록 수정했습니다.
+
 ## [1.2.0] - 2026-05-03
 #### Added
 - **Complete Cloud Migration**: Successfully deployed frontend to Vercel and backend to Render.
 - **Database Transition**: Migrated from local `db.json` to Neon PostgreSQL (Prisma).
-- **Multi-User Support**: Implemented Google OAuth via NextAuth.js for personalized music storage.
-- **Robust Backup/Restore**: Created a defensive data migration tool to import legacy `db.json` into the cloud.
-
-#### Fixed
-- **Deployment Blockers**: Resolved Vercel build errors (Type mismatches) and Render connectivity issues.
-- **OAuth URI Mismatch**: Fixed Google Login "Invalid Request" errors by aligning redirect URIs.
-- **Data Integrity**: Resolved P2003 Foreign Key constraint errors and key name mismatches during cloud migration.
-- **Zombies**: Upgraded `run.bat` to prevent ghost processes in the local environment.
 - **사용자 데이터 백업 및 복원 기능**: 플레이어 상단 로그인 버튼 좌측에 사용자의 재생 기록과 즐겨찾기 데이터를 JSON 파일로 다운로드하고 업로드하여 복원할 수 있는 기능 추가.
 - **Auth.js (NextAuth v5) 연동**: Neon DB와의 사용자 데이터 동기화를 위해 Google 로그인 기능을 실제 구현했습니다. (`signIn`, `signOut`, `useSession` 적용)
 - **Google 로그인 버튼 추가**: 검색창 우측에 DB 동기화 및 개인화를 위한 Google 로그인 버튼을 구현했습니다.
