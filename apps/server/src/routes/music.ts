@@ -25,74 +25,77 @@ const getCookiesArg = () => {
   return [];
 };
 
-router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res) => {
-  const { title, artist, id: trackId } = req.query as { title: string; artist: string; id?: string };
-
-  const cacheKey = trackId ? `stream:${trackId}` : `stream:${artist}:${title}`;
-  const cachedUrl = cache.get(cacheKey);
-  if (cachedUrl) {
-    console.log(`[Stream URL] Cache Hit: ${cacheKey}`);
-    return res.json({ url: cachedUrl });
-  }
-
+router.get('/stream', async (req, res) => {
+  const { id, title, artist } = req.query as { id?: string; title?: string; artist?: string };
+  
   try {
-    let args = [
-      '--get-url',
-      '--format', 'bestaudio/best',
+    let target = '';
+    if (id && id.startsWith('yt_')) {
+      target = `https://www.youtube.com/watch?v=${id.replace('yt_', '')}`;
+    } else if (title && artist) {
+      target = `ytsearch1:${artist} - ${title}`;
+    } else {
+      return res.status(400).json({ error: 'Missing track identification' });
+    }
+
+    console.log(`[Stream Relay] Starting stream for: ${target}`);
+    
+    // Set proper headers for audio streaming
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    const args = [
+      target,
+      '--format', 'bestaudio',
       '--no-playlist',
       '--ignore-errors',
       '--no-warnings',
+      '--extractor-args', 'youtube:player_client=ios,web',
       '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
       '--referer', 'https://www.youtube.com/',
+      '-o', '-', // Output to stdout
       ...getCookiesArg(),
     ];
 
-    if (trackId && trackId.startsWith('yt_')) {
-      const realYtId = trackId.replace('yt_', '');
-      args.push(`https://www.youtube.com/watch?v=${realYtId}`);
-      args.push('--extractor-args', 'youtube:player_client=ios,web');
-      console.log(`[Stream URL] Requesting direct YouTube ID: ${realYtId}`);
-    } else {
-      const keyword = `${artist} - ${title}`;
-      args.push(`ytsearch1:${keyword}`);
-      args.push('--extractor-args', 'youtube:player_client=ios,web');
-      console.log(`[Stream URL] Searching for: "${keyword}"`);
-    }
+    const downloader = spawn(config.ytdlpPath, args);
 
-    const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      execFile(config.ytdlpPath, args, {
-        timeout: 45000,
-        encoding: 'utf8',
-        env: { ...process.env, PYTHONIOENCODING: 'utf8' },
-      }, (error: any, stdout: string, stderr: string) => {
-        if (error && !stdout) {
-          console.error(`[Stream URL] yt-dlp execution error: ${error.message}`);
-          reject(error);
-        } else {
-          resolve({ stdout: (stdout || '').trim(), stderr: stderr || '' });
-        }
-      });
+    downloader.stdout.pipe(res);
+
+    downloader.stderr.on('data', (data) => {
+      const msg = data.toString();
+      if (msg.includes('ERROR')) console.error(`[Stream Relay Error]: ${msg}`);
     });
 
-    if (stderr && stderr.includes('ERROR')) {
-      console.error('[Stream URL yt-dlp Error]:', stderr);
-    }
+    downloader.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`[Stream Relay] yt-dlp exited with code ${code}`);
+        if (!res.headersSent) res.status(500).end();
+      }
+    });
 
-    const streamUrl = stdout.split('\n')[0]?.trim();
-    if (!streamUrl || !streamUrl.startsWith('http')) {
-      throw new Error(`Invalid stream URL extracted: ${streamUrl?.substring(0, 50)}`);
-    }
-
-    cache.set(cacheKey, streamUrl, 300);
-    console.log(`[Stream URL] Success! URL length: ${streamUrl.length}`);
-    res.json({ url: streamUrl });
+    req.on('close', () => {
+      console.log(`[Stream Relay] Client disconnected, killing downloader.`);
+      downloader.kill();
+    });
   } catch (error: any) {
-    console.error('[Stream URL Exception]:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to find streaming source from YouTube',
-      details: error.message
-    });
+    console.error('[Stream Relay Exception]:', error.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Streaming failed' });
   }
+});
+
+router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res) => {
+  const { title, artist, id: trackId } = req.query as { title: string; artist: string; id?: string };
+  
+  // Now we return our own STABLE relay URL instead of a fragile direct YouTube URL
+  const params = new URLSearchParams();
+  if (trackId) params.append('id', trackId);
+  if (title) params.append('title', title);
+  if (artist) params.append('artist', artist);
+
+  const relayUrl = `${config.baseUrl}/api/stream?${params.toString()}`;
+  console.log(`[Stream URL] Returning stable relay link: ${relayUrl}`);
+  
+  res.json({ url: relayUrl });
 });
 
 router.get('/download', validateQuery(Schemas.downloadQuery), async (req, res) => {
