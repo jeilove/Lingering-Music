@@ -127,14 +127,18 @@ async function searchYouTubeViaPiped(query: string): Promise<string | null> {
     const data = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=music_songs`);
     if (data && data.items && data.items.length > 0) {
       const url = data.items[0].url || '';
-      const videoId = url.replace('/watch?v=', '');
-      if (videoId) return videoId;
+      // URL에서 정규식을 사용하여 videoId만 추출 (상대경로/절대경로 모두 대응)
+      const match = url.match(/[?&]v=([^&]+)/) || url.match(/\/watch\?v=([^&]+)/);
+      const videoId = match ? match[1] : url.replace('/watch?v=', '');
+      if (videoId && videoId.length <= 15) return videoId;
     }
     // music_songs 필터 실패 시 일반 검색
     const fallback = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=videos`);
     if (fallback && fallback.items && fallback.items.length > 0) {
       const url = fallback.items[0].url || '';
-      return url.replace('/watch?v=', '') || null;
+      const match = url.match(/[?&]v=([^&]+)/) || url.match(/\/watch\?v=([^&]+)/);
+      const videoId = match ? match[1] : url.replace('/watch?v=', '');
+      if (videoId && videoId.length <= 15) return videoId;
     }
   } catch (err: any) {
     console.warn(`[Piped Search] Failed: ${err.message}`);
@@ -152,6 +156,30 @@ async function searchYouTubeViaPiped(query: string): Promise<string | null> {
   }
 
   return null;
+}
+
+// 최종 수단: yt-dlp를 이용해 스트림 URL만 따오기 (차단 가능성 있음)
+async function getAudioUrlViaYtdlp(videoId: string): Promise<string | null> {
+  console.log(`[Audio] Trying yt-dlp fallback for: ${videoId}`);
+  return new Promise((resolve) => {
+    const args = [
+      `https://www.youtube.com/watch?v=${videoId}`,
+      '--get-url',
+      '--format', 'bestaudio',
+      '--no-playlist',
+      '--ignore-errors',
+      '--extractor-args', 'youtube:player_client=ios,web',
+    ];
+
+    execFile(config.ytdlpPath, args, { timeout: 15000 }, (error, stdout) => {
+      if (error || !stdout) {
+        console.warn(`[Audio yt-dlp fallback] Failed: ${error?.message}`);
+        resolve(null);
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+  });
 }
 
 // ============================================
@@ -178,7 +206,18 @@ router.get('/stream-url', validateQuery(Schemas.streamUrlQuery), async (req, res
     }
 
     console.log(`[Stream URL] Getting audio for videoId: ${videoId}`);
-    const audioUrl = await getAudioUrlFromPiped(videoId);
+    let audioUrl = '';
+    try {
+      audioUrl = await getAudioUrlFromPiped(videoId);
+    } catch (pipedErr) {
+      console.warn(`[Stream URL] Piped/Invidious failed, trying yt-dlp fallback...`);
+      const fallbackUrl = await getAudioUrlViaYtdlp(videoId);
+      if (fallbackUrl) {
+        audioUrl = fallbackUrl;
+      } else {
+        throw pipedErr; // 결국 다 실패하면 원래 에러 던짐
+      }
+    }
     
     console.log(`[Stream URL] Success! Audio URL length: ${audioUrl.length}`);
     res.json({ url: audioUrl, videoId });
