@@ -76,19 +76,31 @@ export async function getLyrics(title: string, artist: string, album?: string, d
 }
 
 export async function downloadTrack(track: Track): Promise<void> {
-  const params = new URLSearchParams({
-    title: track.title,
-    artist: track.artist
-  });
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-  const url = `${API_BASE_URL}/download?${params.toString()}`;
-  
   try {
-    console.log(`[Download] Triggering direct download for: ${track.title}`);
-    alert(`'${track.title}' 음원 추출 및 다운로드를 시작합니다.\n추출에 10~30초 정도 소요될 수 있습니다. 잠시만 기다려 주세요.`);
-    
-    // Direct assignment triggers browser's native download manager immediately after server headers are sent
-    window.location.assign(url);
+    if (isLocal) {
+      console.log(`[Download] Local environment detected. Triggering backend yt-dlp download...`);
+      alert(`'${track.title}' 음원 추출 및 다운로드를 시작합니다.\n추출에 10~30초 정도 소요될 수 있습니다. 잠시만 기다려 주세요.`);
+      const params = new URLSearchParams({ title: track.title, artist: track.artist });
+      window.location.assign(`${API_BASE_URL}/download?${params.toString()}`);
+    } else {
+      console.log(`[Download] Production environment detected. Using client-side stream URL fetch...`);
+      alert(`온라인(Render) 환경에서는 구글 봇 차단 방지를 위해 원본 스트림 페이지를 직접 엽니다.\n새 탭이 열리면 화면 중앙의 재생 바 우측 '점 3개(메뉴)' 버튼을 눌러 [다운로드]를 선택해 주세요. (m4a 형식 저장)`);
+      
+      const params = new URLSearchParams({ title: track.title, artist: track.artist });
+      const res = await fetch(`${API_BASE_URL}/stream-url?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch stream URL');
+      }
+      
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        throw new Error('No audio URL returned');
+      }
+    }
   } catch (error) {
     console.error('Download trigger error:', error);
     alert('다운로드 요청 중 오류가 발생했습니다.');
