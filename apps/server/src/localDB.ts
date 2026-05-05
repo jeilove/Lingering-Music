@@ -220,25 +220,39 @@ class NeonDB {
       for (const chunk of historyChunks) {
         await Promise.all(chunk.map(async (h: any) => {
           try {
-            // Flexible date handling with any cast to avoid TS errors on dynamic fields
+            // Flexible track ID handling
+            const trackId = h.trackId || h.id || h.songId;
+            if (!trackId) return;
+
+            // Flexible date handling
             const rawDate = h.playedAt || h.timestamp || h.played_at || new Date();
             const date = new Date(rawDate);
             
-            if (isNaN(date.getTime())) {
-              historyFail++;
-              return;
-            }
+            if (isNaN(date.getTime())) return;
+
+            // CRITICAL: Ensure track exists before history (even if it's a dummy record)
+            // to satisfy foreign key constraint
+            await prisma.track.upsert({
+              where: { id: trackId },
+              update: {},
+              create: { 
+                id: trackId,
+                title: h.title || 'Recovered Track',
+                artist: h.artist || 'Unknown'
+              }
+            });
 
             await prisma.history.create({
               data: {
                 userId,
-                trackId: h.trackId,
+                trackId,
                 timestamp: date
               }
             });
             historySuccess++;
-          } catch (e) {
+          } catch (e: any) {
             historyFail++;
+            console.error(`[NeonDB] History item fail: ${e.message}`);
           }
         }));
       }
