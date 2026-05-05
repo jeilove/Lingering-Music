@@ -143,7 +143,11 @@ export class BackendStorageProvider implements Storage {
         headers: this.getHeaders()
       });
       if (!res.ok) return [];
-      return await res.json();
+      const data = await res.json();
+      return data.map((h: any) => ({
+        ...h,
+        playedAt: h.timestamp || h.playedAt
+      }));
     } catch (e) {
       console.error('[StorageProvider] getHistory failed:', e);
       return [];
