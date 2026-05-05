@@ -55,7 +55,7 @@ export function CompactTrackItem({ track, onClick, active, accentColor = 'primar
         {track.tags && track.tags.length > 0 && (
           <div className="flex gap-1 mt-0.5">
             {track.tags.slice(0, 2).map((tag: string) => (
-              <span key={tag} className={cn("text-[8px] font-medium opacity-60", accentClass)}>#{tag.replace('#', '')}</span>
+              <span key={tag} className={cn("text-[8px] font-black uppercase tracking-wider opacity-90", accentClass)}>#{tag.replace('#', '')}</span>
             ))}
           </div>
         )}
@@ -71,7 +71,7 @@ export function CompactTrackItem({ track, onClick, active, accentColor = 'primar
         >
           <Download className="w-3.5 h-3.5" />
         </button>
-        <span className="text-[9px] text-white/20 font-medium tabular-nums">
+        <span className="text-[10px] text-white font-bold tabular-nums">
           {Math.floor((track.duration || 0) / 60)}:{((track.duration || 0) % 60).toString().padStart(2, '0')}
         </span>
       </div>
