@@ -218,9 +218,9 @@ class NeonDB {
       }
 
       for (const chunk of historyChunks) {
-        await Promise.all(chunk.map(async (h) => {
+        await Promise.all(chunk.map(async (h: any) => {
           try {
-            // Flexible date handling
+            // Flexible date handling with any cast to avoid TS errors on dynamic fields
             const rawDate = h.playedAt || h.timestamp || h.played_at || new Date();
             const date = new Date(rawDate);
             
