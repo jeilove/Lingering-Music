@@ -188,6 +188,12 @@ class NeonDB {
     try {
       console.log(`[NeonDB] bulkSave starting for user: ${userId}. Tracks: ${tracks.length}, History: ${history.length}, Favorites: ${favorites.length}`);
       
+      const stats = {
+        tracks: { success: 0, fail: 0 },
+        history: { success: 0, fail: 0 },
+        favorites: { success: 0, fail: 0 }
+      };
+
       // 0. Ensure user exists
       await prisma.user.upsert({
         where: { id: userId },
@@ -198,20 +204,23 @@ class NeonDB {
         }
       });
 
-      // 1. Tracks (Global) - Use parallel processing in chunks to avoid overwhelming the DB
+      // 1. Tracks (Global)
       const CHUNK_SIZE = 20;
       for (let i = 0; i < tracks.length; i += CHUNK_SIZE) {
         const chunk = tracks.slice(i, i + CHUNK_SIZE);
-        await Promise.all(chunk.map(t => this.saveTrack(t)));
-        console.log(`[NeonDB] Migrated tracks chunk ${i / CHUNK_SIZE + 1}...`);
+        await Promise.all(chunk.map(async (t) => {
+          try {
+            await this.saveTrack(t);
+            stats.tracks.success++;
+          } catch (e) {
+            stats.tracks.fail++;
+          }
+        }));
       }
 
       // 2. History (User specific)
       await prisma.history.deleteMany({ where: { userId } });
       
-      let historySuccess = 0;
-      let historyFail = 0;
-
       const historyChunks = [];
       for (let i = 0; i < history.length; i += CHUNK_SIZE) {
         historyChunks.push(history.slice(i, i + CHUNK_SIZE));
@@ -220,18 +229,19 @@ class NeonDB {
       for (const chunk of historyChunks) {
         await Promise.all(chunk.map(async (h: any) => {
           try {
-            // Flexible track ID handling
             const trackId = h.trackId || h.id || h.songId;
-            if (!trackId) return;
+            if (!trackId) {
+              stats.history.fail++;
+              return;
+            }
 
-            // Flexible date handling
             const rawDate = h.playedAt || h.timestamp || h.played_at || new Date();
             const date = new Date(rawDate);
-            
-            if (isNaN(date.getTime())) return;
+            if (isNaN(date.getTime())) {
+              stats.history.fail++;
+              return;
+            }
 
-            // CRITICAL: Ensure track exists before history (even if it's a dummy record)
-            // to satisfy foreign key constraint
             await prisma.track.upsert({
               where: { id: trackId },
               update: {},
@@ -249,21 +259,25 @@ class NeonDB {
                 timestamp: date
               }
             });
-            historySuccess++;
+            stats.history.success++;
           } catch (e: any) {
-            historyFail++;
-            console.error(`[NeonDB] History item fail: ${e.message}`);
+            stats.history.fail++;
           }
         }));
       }
-      console.log(`[NeonDB] History migration for ${userId}: ${historySuccess} success, ${historyFail} fail`);
 
       // 3. Favorites (User specific)
       for (const g of favorites) {
-        await this.saveFavoriteGroup(userId, g);
+        try {
+          await this.saveFavoriteGroup(userId, g);
+          stats.favorites.success++;
+        } catch (e) {
+          stats.favorites.fail++;
+        }
       }
       
-      console.log(`[NeonDB] bulkSave completed for user: ${userId}`);
+      console.log(`[NeonDB] bulkSave completed for ${userId}:`, stats);
+      return stats;
     } catch (error) {
       console.error('[NeonDB] bulkSave error:', error);
       throw error;

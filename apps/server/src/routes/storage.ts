@@ -42,15 +42,22 @@ router.post('/storage/adopt-anonymous', async (req, res) => {
 
 // --- Storage API ---
 
-// Batch Migration
-router.post('/storage/migrate', validateBody(Schemas.migrateBatch), async (req, res) => {
+// Batch Migration - Temporarily relaxed validation to see raw data structure
+router.post('/storage/migrate', async (req, res) => {
   try {
     const userId = getUserId(req);
-    const { tracks, history, favorites } = req.body;
-    console.log(`[Migration] User ${userId} is migrating ${tracks.length} tracks, ${history.length} history items, and ${favorites.length} groups`);
-    await localDB.bulkSave(userId, tracks, history, favorites);
-    console.log(`[Migration] User ${userId} migration successful`);
-    res.sendStatus(200);
+    const { tracks = [], history = [], favorites = [] } = req.body;
+    
+    console.log(`[Migration DEBUG] User ${userId} raw payload:`, {
+      trackKeys: tracks[0] ? Object.keys(tracks[0]) : [],
+      historyKeys: history[0] ? Object.keys(history[0]) : [],
+      favoriteKeys: favorites[0] ? Object.keys(favorites[0]) : [],
+      counts: { tracks: tracks.length, history: history.length, favorites: favorites.length }
+    });
+
+    const result = await localDB.bulkSave(userId, tracks, history, favorites);
+    console.log(`[Migration] User ${userId} result:`, result);
+    res.json(result);
   } catch (err: any) {
     console.error('Storage POST /migrate error:', err.message);
     res.status(500).json({ error: err.message });

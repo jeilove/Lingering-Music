@@ -199,7 +199,7 @@ export class BackendStorageProvider implements Storage {
     }
   }
 
-  async migrateBatch(tracks: Track[], history: PlayHistory[], favorites: FavoriteGroup[]): Promise<void> {
+  async migrateBatch(tracks: Track[], history: PlayHistory[], favorites: FavoriteGroup[]): Promise<any> {
     try {
       await fetch(`${API_BASE_URL}/storage/migrate`, {
         method: 'POST',
