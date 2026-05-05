@@ -28,16 +28,20 @@ const getCookiesArg = () => {
 // Piped/Invidious API 인스턴스 (실시간 확인된 살아있는 것들만)
 // ============================================
 const PIPED_INSTANCES = [
-  'https://api.piped.private.coffee',
-  'https://pipedapi.lunar.icu',
   'https://pipedapi.kavin.rocks',
+  'https://pipedapi.lunar.icu',
+  'https://api.piped.private.coffee',
   'https://piped-api.garudalinux.org',
+  'https://pipedapi-libre.kavin.rocks',
+  'https://pipedapi.rivo.gg',
 ];
 
 const INVIDIOUS_INSTANCES = [
-  'https://inv.thepixora.com',
+  'https://invidious.flokinet.to',
   'https://inv.nadeko.net',
   'https://invidious.nerdvpn.de',
+  'https://inv.tux.sh',
+  'https://invidious.projectsegfau.lt',
 ];
 
 // Piped API 요청 헬퍼
