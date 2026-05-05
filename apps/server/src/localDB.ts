@@ -209,6 +209,9 @@ class NeonDB {
       // 2. History (User specific)
       await prisma.history.deleteMany({ where: { userId } });
       
+      let historySuccess = 0;
+      let historyFail = 0;
+
       const historyChunks = [];
       for (let i = 0; i < history.length; i += CHUNK_SIZE) {
         historyChunks.push(history.slice(i, i + CHUNK_SIZE));
@@ -217,16 +220,29 @@ class NeonDB {
       for (const chunk of historyChunks) {
         await Promise.all(chunk.map(async (h) => {
           try {
+            // Flexible date handling
+            const rawDate = h.playedAt || h.timestamp || h.played_at || new Date();
+            const date = new Date(rawDate);
+            
+            if (isNaN(date.getTime())) {
+              historyFail++;
+              return;
+            }
+
             await prisma.history.create({
               data: {
                 userId,
                 trackId: h.trackId,
-                timestamp: new Date(h.playedAt)
+                timestamp: date
               }
             });
-          } catch (e) {}
+            historySuccess++;
+          } catch (e) {
+            historyFail++;
+          }
         }));
       }
+      console.log(`[NeonDB] History migration for ${userId}: ${historySuccess} success, ${historyFail} fail`);
 
       // 3. Favorites (User specific)
       for (const g of favorites) {
