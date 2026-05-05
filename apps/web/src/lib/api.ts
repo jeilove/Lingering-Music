@@ -1,6 +1,16 @@
 import { Track } from '@music-player/shared';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001/api';
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `http://${hostname}:3001/api`;
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'https://lingering-music.onrender.com/api';
+};
+
+export const API_BASE_URL = getBaseUrl();
 
 export async function searchMusic(query: string): Promise<Track[]> {
   if (!query) return [];
