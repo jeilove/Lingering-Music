@@ -46,6 +46,7 @@ interface PlayerState {
   removeFromHistory: (trackId: string) => Promise<void>;
   setCurrentTime: (time: number) => void;
   restoreFromBackup: (data: any) => Promise<void>;
+  forceSync: () => Promise<void>;
 }
 
 const storage = new BackendStorageProvider();
@@ -442,6 +443,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setLyricsOpen: (open) => set({ isLyricsOpen: open }),
   setCurrentTime: (time) => set({ currentTime: time }),
+  
+  forceSync: async () => {
+    console.log('[PlayerStore] Force syncing storage...');
+    // Clear migration flag for current user to allow re-migration if data is missing
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`vibe_storage_migrated_${currentUserId || 'anon'}`);
+    }
+    isInitialized = false;
+    await initStorage({ setState: set, getState: get });
+  },
 
   restoreFromBackup: async (data) => {
     await storage.init();

@@ -74,7 +74,7 @@ export default function LibraryPage() {
           <span className="text-xs font-mono text-white/40">Active User ID: {usePlayerStore.getState().userId || 'Guest (Local Only)'}</span>
         </div>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={() => usePlayerStore.getState().forceSync()}
           className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-white transition-colors"
         >
           Force Sync
