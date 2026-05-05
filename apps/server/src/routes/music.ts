@@ -179,15 +179,23 @@ async function searchYouTubeViaPiped(query: string): Promise<string | null> {
     console.warn(`[Piped Search] Failed: ${err.message}`);
   }
 
-  // 2차: Invidious 검색
+  // 3차: Server-side Search Fallback (Scraping/Direct)
   try {
-    console.log(`[Search] Piped search failed, trying Invidious...`);
-    const data = await invidiousFetch(`/search?q=${encodeURIComponent(query)}&type=video`);
-    if (data && data.length > 0) {
-      return data[0].videoId || null;
+    console.log(`[Search] Piped/Invidious failed, trying Server-side Scraping for: ${query}`);
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAQ%253D%253D`; // sp=EgIQAQ%3D%3D filters for videos only
+    const res = await axios.get(searchUrl, { 
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36' },
+      timeout: 8000
+    });
+    
+    const html = res.data;
+    const videoIdMatch = html.match(/"videoId":"([^"]+)"/);
+    if (videoIdMatch && videoIdMatch[1]) {
+      console.log(`[Search] Success via Scraping! videoId: ${videoIdMatch[1]}`);
+      return videoIdMatch[1];
     }
   } catch (err: any) {
-    console.warn(`[Invidious Search] Failed: ${err.message}`);
+    console.warn(`[Scraping Search] Failed: ${err.message}`);
   }
 
   return null;
