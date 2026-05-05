@@ -388,8 +388,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       mainGroup.tracks.push(track);
     }
 
-    await storage.saveFavoriteGroup(mainGroup);
-    await get().loadFavorites();
+    try {
+      await storage.saveFavoriteGroup(mainGroup);
+      await get().loadFavorites();
+      console.log(`[PlayerStore] Toggle favorite successful for: ${track.title}`);
+    } catch (error) {
+      console.error('[PlayerStore] Failed to toggle favorite:', error);
+      alert('즐겨찾기 저장 중 오류가 발생했습니다. DB 상태를 확인해 주세요.');
+    }
   },
 
   updateTrackTags: async (trackId, tags) => {
