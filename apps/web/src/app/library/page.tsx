@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 import { FavoritePicker } from '../../components/FavoritePicker';
 import { TrackCard } from '../../components/TrackCard';
 import { CompactTrackItem } from '../../components/CompactTrackItem';
+import { AccordionSection } from '../../components/AccordionSection';
 
 export default function LibraryPage() {
   const { 
@@ -64,14 +65,11 @@ export default function LibraryPage() {
       </div>
 
       {/* Recently Played */}
-      <section className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
-            최근 재생한 곡
-          </h2>
-        </div>
-
+      <AccordionSection
+        title="최근 재생한 곡"
+        description="최근에 들었던 곡들을 다시 확인하세요"
+        icon={<Clock className="w-6 h-6" />}
+      >
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
           {recentTracks.length > 0 ? (
             recentTracks.map((track) => (
@@ -91,7 +89,7 @@ export default function LibraryPage() {
             </div>
           )}
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Favorites List Details */}
       {selectedGroup && (

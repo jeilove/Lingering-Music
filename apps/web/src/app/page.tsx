@@ -12,6 +12,7 @@ import { cn } from "../lib/utils";
 import { AIRecommendation } from "../components/AIRecommendation";
 
 import { TrackCard } from "../components/TrackCard";
+import { AccordionSection } from "../components/AccordionSection";
 
 export default function Home() {
   const [openPickerId, setOpenPickerId] = React.useState<string | null>(null);
@@ -51,12 +52,11 @@ export default function Home() {
       </div>
 
       {/* Recommended Section */}
-      <section className="flex flex-col gap-8 h-fit">
-        <div className="flex items-end justify-between px-2">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-2xl font-bold tracking-tight text-white">당신을 위한 추천</h2>
-            <p className="text-muted-foreground/60 text-xs font-bold tracking-widest uppercase">3회 이상 재생했거나 유사한 태그를 기반으로 엄선했습니다</p>
-          </div>
+      <AccordionSection
+        title="당신을 위한 추천"
+        description="3회 이상 재생했거나 유사한 태그를 기반으로 엄선했습니다"
+        icon={<Sparkles className="w-6 h-6" />}
+        headerRight={
           <div className="flex items-center gap-4">
             {selectedIds.size > 0 && (
               <button 
@@ -68,8 +68,8 @@ export default function Home() {
             )}
             <button className="text-[10px] text-primary/60 hover:text-primary transition-colors font-black uppercase tracking-[0.2em] bg-primary/5 px-4 py-2 rounded-full border border-primary/10">전체보기</button>
           </div>
-        </div>
-
+        }
+      >
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-6 gap-6">
           {recommendations.length > 0 ? (
             recommendations.map((track) => (
@@ -101,7 +101,7 @@ export default function Home() {
             </div>
           )}
         </div>
-      </section>
+      </AccordionSection>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start h-fit border-t border-white/5 pt-12">
         {/* Dynamic Tag Discovery Section */}
