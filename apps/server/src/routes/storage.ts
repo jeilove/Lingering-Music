@@ -16,9 +16,10 @@ router.get('/health', (_req, res) => {
 });
 
 // Debug Stats (Check total DB counts)
-router.get('/storage/debug-stats', async (_req, res) => {
+router.get('/storage/debug-stats', async (req, res) => {
   try {
-    const stats = await localDB.getGlobalStats();
+    const userId = getUserId(req);
+    const stats = await localDB.getGlobalStats(userId);
     res.json(stats);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -287,7 +287,7 @@ class NeonDB {
     }
   }
 
-  async getGlobalStats() {
+  async getGlobalStats(userId?: string) {
     try {
       const [userCount, trackCount, historyCount, favoriteCount] = await Promise.all([
         prisma.user.count(),
@@ -295,11 +295,27 @@ class NeonDB {
         prisma.history.count(),
         prisma.favoriteGroup.count(),
       ]);
+
+      let userStats = null;
+      if (userId) {
+        const [uHistory, uFavorites] = await Promise.all([
+          prisma.history.count({ where: { userId } }),
+          prisma.favoriteGroup.count({ where: { userId } }),
+        ]);
+        userStats = {
+          history: uHistory,
+          favorites: uFavorites
+        };
+      }
+
       return {
-        users: userCount,
-        tracks: trackCount,
-        history: historyCount,
-        favorites: favoriteCount,
+        global: {
+          users: userCount,
+          tracks: trackCount,
+          history: historyCount,
+          favorites: favoriteCount,
+        },
+        user: userStats,
         timestamp: new Date().toISOString()
       };
     } catch (error: any) {

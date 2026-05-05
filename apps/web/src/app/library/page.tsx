@@ -156,18 +156,37 @@ export default function LibraryPage() {
                 <p className="text-[10px] text-primary/60 uppercase tracking-widest font-black">Neon PostgreSQL (Cloud)</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-8">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary/20">Total Tracks</span>
-                <span className="text-3xl font-black text-white tracking-tighter">{diagStats?.remote?.tracks ?? '-'}</span>
+            
+            <div className="flex flex-col gap-6">
+              {/* User Specific Stats */}
+              <div className="p-4 bg-primary/10 rounded-2xl border border-primary/20">
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Your Specific Data</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Your History</span>
+                    <span className="text-2xl font-black text-white tracking-tighter">{diagStats?.remote?.user?.history ?? '-'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Your Groups</span>
+                    <span className="text-2xl font-black text-white tracking-tighter">{diagStats?.remote?.user?.favorites ?? '-'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary/20">Total History</span>
-                <span className="text-3xl font-black text-white tracking-tighter">{diagStats?.remote?.history ?? '-'}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary/20">Total Groups</span>
-                <span className="text-3xl font-black text-white tracking-tighter">{diagStats?.remote?.favorites ?? '-'}</span>
+
+              {/* Global Stats */}
+              <div className="grid grid-cols-3 gap-4 opacity-50">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Global Tracks</span>
+                  <span className="text-lg font-black text-white tracking-tighter">{diagStats?.remote?.global?.tracks ?? '-'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Global Hist</span>
+                  <span className="text-lg font-black text-white tracking-tighter">{diagStats?.remote?.global?.history ?? '-'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Global Grps</span>
+                  <span className="text-lg font-black text-white tracking-tighter">{diagStats?.remote?.global?.favorites ?? '-'}</span>
+                </div>
               </div>
             </div>
           </div>
