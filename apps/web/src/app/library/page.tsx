@@ -9,6 +9,7 @@ import { FavoritePicker } from '../../components/FavoritePicker';
 import { TrackCard } from '../../components/TrackCard';
 import { CompactTrackItem } from '../../components/CompactTrackItem';
 import { AccordionSection } from '../../components/AccordionSection';
+import { SearchSection } from '../../components/SearchSection';
 
 export default function LibraryPage() {
   const { 
@@ -56,11 +57,35 @@ export default function LibraryPage() {
 
   return (
     <div className="p-8 pb-32 flex flex-col gap-12 max-w-[1400px] mx-auto">
+      {/* Top Header (Navigation & Search) */}
+      <div className="sticky top-0 bg-black/40 backdrop-blur-2xl py-6 z-40 -mx-8 px-8 border-b border-white/5">
+        <div className="flex items-center justify-between gap-8">
+          <div className="flex-1">
+            <SearchSection />
+          </div>
+        </div>
+      </div>
+
+      {/* Debug Info (Only for troubleshooting) */}
+      <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">System Status</span>
+          <span className="text-xs font-mono text-white/40">Active User ID: {usePlayerStore.getState().getUserId ? "Loading..." : (typeof window !== 'undefined' ? (window as any).currentUserId || 'Checking...' : 'Server')}</span>
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-white transition-colors"
+        >
+          Force Sync
+        </button>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-2">
-          <h1 className="text-4xl font-bold tracking-tight text-white">Your Library</h1>
-          <p className="text-muted-foreground text-sm">재생 기록과 즐겨찾는 플레이리스트를 관리하세요.</p>
+          <h1 className="text-4xl font-bold tracking-tight text-white italic">Your Library</h1>
+          <p className="text-muted-foreground text-sm font-medium">재생 기록과 즐겨찾는 플레이리스트를 관리하세요.</p>
         </div>
       </div>
 
