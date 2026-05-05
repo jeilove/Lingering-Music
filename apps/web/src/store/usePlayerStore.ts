@@ -78,7 +78,15 @@ const migrateData = async () => {
     }
     
     const favorites = await oldLocalStorage.getFavoriteGroups();
-    await storage.migrateBatch(tracks, history, favorites);
+    
+    // SAFETY: Only migrate if there is actually data to migrate!
+    // This prevents wiping the server DB with an empty local DB.
+    if (tracks.length > 0 || history.length > 0 || favorites.length > 0) {
+      console.log(`[Migration] Migrating ${tracks.length} tracks, ${history.length} history items, and ${favorites.length} groups...`);
+      await storage.migrateBatch(tracks, history, favorites);
+    } else {
+      console.log('[Migration] Local storage is empty, skipping migration to protect server data.');
+    }
 
     localStorage.setItem(`vibe_storage_migrated_${currentUserId || 'anon'}`, 'true');
     console.log('[Migration] Batch migration completed.');
@@ -475,8 +483,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   restoreFromBackup: async (data) => {
-    await storage.init();
-    
     console.log('[Restore] Original Data Keys:', Object.keys(data));
     
     // 1. Convert tracks (handle both Object and Array)
@@ -488,31 +494,29 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // 2. Handle History
     const history = data.history || [];
     
-    // 3. Handle Favorites (Defensive check for multiple possible keys)
-    // Legacy db.json uses 'favoriteGroups', some versions might use 'favorites' or 'groups'
+    // 3. Handle Favorites
     const favorites = data.favorites || data.favoriteGroups || data.groups || [];
     
-    console.log('[Restore] Processed Data:', {
-      tracksCount: tracks.length,
-      historyCount: history.length,
-      favoritesCount: favorites.length
-    });
-    
-    if (favorites.length === 0) {
-      console.warn('[Restore] No favorites found! Data sample:', JSON.stringify(data).substring(0, 500));
-    }
+    console.log('[Restore] Data to migrate:', { tracks: tracks.length, history: history.length, favorites: favorites.length });
 
     try {
-      // Call backend migrate Batch
-      await storage.migrateBatch(tracks, history, favorites);
+      await storage.init();
+      const result = await storage.migrateBatch(tracks, history, favorites);
+      
+      // CRITICAL: Set migration flag to true so automated migration doesn't overwrite this
+      const currentUserId = get().userId || 'anonymous';
+      localStorage.setItem(`vibe_storage_migrated_${currentUserId}`, 'true');
       
       // Reload state
-      await get().loadHistory();
-      await get().loadFavorites();
-      alert(`백업 데이터 복원이 완료되었습니다!\n(노래: ${tracks.length}곡, 히스토리: ${history.length}개, 즐겨찾기: ${favorites.length}그룹)`);
+      isInitialized = false;
+      await initStorage({ setState: set, getState: get });
+
+      if (result) {
+        alert(`복구 결과:\n노래: ${result.tracks.success}개 성공\n히스토리: ${result.history.success}개 성공\n즐겨찾기: ${result.favorites.success}개 성공\n\n이제 데이터가 안전하게 유지됩니다!`);
+      }
     } catch (error) {
       console.error('[Restore] Migration failed:', error);
-      alert('데이터 복구 중 오류가 발생했습니다. 콘솔 로그를 확인해주세요.');
+      alert('데이터 복구 중 오류가 발생했습니다.');
     }
   }
 }));
