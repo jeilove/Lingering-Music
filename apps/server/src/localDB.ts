@@ -76,6 +76,7 @@ class NeonDB {
   // Favorites
   async getFavoriteGroups(userId: string) {
     try {
+      console.log(`[NeonDB] Fetching favorites for user: ${userId}`);
       const groups = await prisma.favoriteGroup.findMany({
         where: { userId },
         include: { 
@@ -140,6 +141,7 @@ class NeonDB {
   // History
   async getHistory(userId: string, limit: number = 200) {
     try {
+      console.log(`[NeonDB] Fetching history for user: ${userId}`);
       const history = await prisma.history.findMany({
         where: { userId },
         take: limit,

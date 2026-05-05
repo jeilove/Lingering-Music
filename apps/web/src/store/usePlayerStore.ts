@@ -151,15 +151,24 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentTime: 0,
 
   setUserId: async (userId) => {
-    if (currentUserId === userId) return;
+    // Treat undefined/empty as null for consistency
+    const normalizedId = userId || null;
     
-    console.log('[PlayerStore] User ID changed:', currentUserId, '->', userId);
-    currentUserId = userId;
-    storage.setUserId(userId);
+    if (currentUserId === normalizedId && isInitialized) return;
     
-    // Reset initialization to trigger reload
+    console.log('[PlayerStore] User ID transition:', currentUserId, '->', normalizedId);
+    currentUserId = normalizedId;
+    storage.setUserId(normalizedId);
+    
+    // Hard reset initialization state to force clean reload
     isInitialized = false;
-    await initStorage({ setState: set, getState: get });
+    
+    try {
+      await initStorage({ setState: set, getState: get });
+      console.log('[PlayerStore] Storage re-initialized for user:', normalizedId);
+    } catch (error) {
+      console.error('[PlayerStore] Failed to re-initialize storage:', error);
+    }
   },
 
   setCurrentTrack: (track) => {
