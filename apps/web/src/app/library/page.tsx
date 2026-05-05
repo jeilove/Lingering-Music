@@ -82,19 +82,18 @@ export default function LibraryPage() {
         </div>
       </div>
 
-      {/* Diagnostic Center */}
+      {/* Diagnostic Center - Simplified & Safe */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={cn(
-              "w-10 h-10 rounded-2xl flex items-center justify-center transition-all",
-              isDiagnosing ? "bg-primary animate-pulse shadow-lg shadow-primary/40" : "bg-primary/20 text-primary"
+              "w-10 h-10 rounded-2xl flex items-center justify-center bg-primary/20 text-primary"
             )}>
               <Sparkles className="w-6 h-6" />
             </div>
             <div className="flex flex-col">
-              <h3 className="text-lg font-black text-white uppercase tracking-tight">Data Diagnostic Center</h3>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">System Integrity & Sync Status</p>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">System Status</h3>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">Data Integrity & Session</p>
             </div>
           </div>
           <button 
@@ -109,32 +108,12 @@ export default function LibraryPage() {
           >
             {isDiagnosing ? "Analyzing..." : "Refresh Stats"}
           </button>
-          
-          <button 
-            disabled={isDiagnosing}
-            onClick={async () => {
-              setIsDiagnosing(true);
-              await usePlayerStore.getState().adoptAnonymousData();
-              const stats = await usePlayerStore.getState().getStorageStats();
-              setDiagStats(stats);
-              setIsDiagnosing(false);
-              alert('데이터 복구 시도가 완료되었습니다. 재생 목록을 확인해 보세요!');
-            }}
-            className={cn(
-              "text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full border transition-all active:scale-95",
-              isDiagnosing 
-                ? "bg-white/10 border-white/10 text-white/40 cursor-wait" 
-                : "bg-primary text-white border-primary shadow-lg shadow-primary/20 hover:bg-primary/80"
-            )}
-          >
-            {isDiagnosing ? "Recovering..." : "Recover & Adopt My Data"}
-          </button>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Local Storage Stats */}
           <div className="glass-card p-6 rounded-[32px] bg-white/[0.02] border border-white/5 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+            <div className="absolute top-0 right-0 p-6 opacity-5">
               <Clock className="w-24 h-24" />
             </div>
             <div className="flex items-center gap-3 mb-6">
@@ -142,8 +121,8 @@ export default function LibraryPage() {
                 <Clock className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Local Browser Storage</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">IndexedDB (Offline)</p>
+                <p className="text-sm font-bold text-white">Browser Cache</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">Local IndexedDB</p>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-8">
@@ -164,7 +143,7 @@ export default function LibraryPage() {
 
           {/* Remote DB Stats */}
           <div className="glass-card p-6 rounded-[32px] bg-primary/5 border border-primary/10 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+            <div className="absolute top-0 right-0 p-6 opacity-5">
               <Navigation className="w-24 h-24" />
             </div>
             <div className="flex items-center gap-3 mb-6">
@@ -172,40 +151,23 @@ export default function LibraryPage() {
                 <Navigation className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Online Cloud DB</p>
-                <p className="text-[10px] text-primary/60 uppercase tracking-widest font-black">Neon PostgreSQL (Cloud)</p>
+                <p className="text-sm font-bold text-white">Cloud Database</p>
+                <p className="text-[10px] text-primary/60 uppercase tracking-widest font-black">Neon PostgreSQL</p>
               </div>
             </div>
             
             <div className="flex flex-col gap-6">
-              {/* User Specific Stats */}
               <div className="p-4 bg-primary/10 rounded-2xl border border-primary/20">
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Your Specific Data</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Your Account Records</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Your History</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20">History</span>
                     <span className="text-2xl font-black text-white tracking-tighter">{diagStats?.remote?.user?.history ?? '-'}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Your Groups</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Groups</span>
                     <span className="text-2xl font-black text-white tracking-tighter">{diagStats?.remote?.user?.favorites ?? '-'}</span>
                   </div>
-                </div>
-              </div>
-
-              {/* Global Stats */}
-              <div className="grid grid-cols-3 gap-4 opacity-50">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Global Tracks</span>
-                  <span className="text-lg font-black text-white tracking-tighter">{diagStats?.remote?.global?.tracks ?? '-'}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Global Hist</span>
-                  <span className="text-lg font-black text-white tracking-tighter">{diagStats?.remote?.global?.history ?? '-'}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Global Grps</span>
-                  <span className="text-lg font-black text-white tracking-tighter">{diagStats?.remote?.global?.favorites ?? '-'}</span>
                 </div>
               </div>
             </div>
@@ -217,13 +179,8 @@ export default function LibraryPage() {
           <div className="flex items-center gap-4">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Active Session ID</span>
-            <span className="text-xs font-mono text-emerald-500/80">{usePlayerStore.getState().userId || 'Guest (Local Only)'}</span>
+            <span className="text-xs font-mono text-emerald-500/80">{usePlayerStore.getState().userId || 'Guest'}</span>
           </div>
-          {diagStats && (
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/20">
-              Last Analysis: {new Date().toLocaleTimeString()}
-            </span>
-          )}
         </div>
       </div>
 
