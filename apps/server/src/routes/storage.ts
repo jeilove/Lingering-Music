@@ -32,7 +32,9 @@ router.post('/storage/migrate', validateBody(Schemas.migrateBatch), async (req, 
   try {
     const userId = getUserId(req);
     const { tracks, history, favorites } = req.body;
+    console.log(`[Migration] User ${userId} is migrating ${tracks.length} tracks, ${history.length} history items, and ${favorites.length} groups`);
     await localDB.bulkSave(userId, tracks, history, favorites);
+    console.log(`[Migration] User ${userId} migration successful`);
     res.sendStatus(200);
   } catch (err: any) {
     console.error('Storage POST /migrate error:', err.message);

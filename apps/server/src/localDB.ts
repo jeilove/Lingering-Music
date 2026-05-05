@@ -188,37 +188,44 @@ class NeonDB {
     try {
       console.log(`[NeonDB] bulkSave starting for user: ${userId}. Tracks: ${tracks.length}, History: ${history.length}, Favorites: ${favorites.length}`);
       
-      // 0. CRITICAL: Ensure user exists in User table before creating related records
-      // This prevents P2003 foreign key constraint errors
+      // 0. Ensure user exists
       await prisma.user.upsert({
         where: { id: userId },
         update: {},
         create: { 
           id: userId,
-          email: `${userId}@migrated.local`, // Placeholder email for migrated users
+          email: `${userId}@migrated.local`,
         }
       });
 
-      // 1. Tracks (Global)
-      for (const t of tracks) {
-        await this.saveTrack(t);
+      // 1. Tracks (Global) - Use parallel processing in chunks to avoid overwhelming the DB
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < tracks.length; i += CHUNK_SIZE) {
+        const chunk = tracks.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(t => this.saveTrack(t)));
+        console.log(`[NeonDB] Migrated tracks chunk ${i / CHUNK_SIZE + 1}...`);
       }
 
       // 2. History (User specific)
       await prisma.history.deleteMany({ where: { userId } });
       
-      for (const h of history) {
-        try {
-          await prisma.history.create({
-            data: {
-              userId,
-              trackId: h.trackId,
-              timestamp: new Date(h.playedAt)
-            }
-          });
-        } catch (e) {
-          // Skip individual failures (e.g. invalid date or missing track)
-        }
+      const historyChunks = [];
+      for (let i = 0; i < history.length; i += CHUNK_SIZE) {
+        historyChunks.push(history.slice(i, i + CHUNK_SIZE));
+      }
+
+      for (const chunk of historyChunks) {
+        await Promise.all(chunk.map(async (h) => {
+          try {
+            await prisma.history.create({
+              data: {
+                userId,
+                trackId: h.trackId,
+                timestamp: new Date(h.playedAt)
+              }
+            });
+          } catch (e) {}
+        }));
       }
 
       // 3. Favorites (User specific)
@@ -229,6 +236,7 @@ class NeonDB {
       console.log(`[NeonDB] bulkSave completed for user: ${userId}`);
     } catch (error) {
       console.error('[NeonDB] bulkSave error:', error);
+      throw error;
     }
   }
 
