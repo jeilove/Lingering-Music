@@ -223,4 +223,15 @@ export class BackendStorageProvider implements Storage {
       return [];
     }
   }
+
+  async getGlobalStats(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/storage/debug-stats`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error('[StorageProvider] getGlobalStats failed:', e);
+      return null;
+    }
+  }
 }

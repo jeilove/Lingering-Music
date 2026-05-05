@@ -278,6 +278,27 @@ class NeonDB {
       return [];
     }
   }
+
+  async getGlobalStats() {
+    try {
+      const [userCount, trackCount, historyCount, favoriteCount] = await Promise.all([
+        prisma.user.count(),
+        prisma.track.count(),
+        prisma.history.count(),
+        prisma.favoriteGroup.count(),
+      ]);
+      return {
+        users: userCount,
+        tracks: trackCount,
+        history: historyCount,
+        favorites: favoriteCount,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('[NeonDB] getGlobalStats error:', error);
+      throw error;
+    }
+  }
 }
 
 export const localDB = new NeonDB();

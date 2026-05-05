@@ -15,6 +15,16 @@ router.get('/health', (_req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
 });
 
+// Debug Stats (Check total DB counts)
+router.get('/storage/debug-stats', async (_req, res) => {
+  try {
+    const stats = await localDB.getGlobalStats();
+    res.json(stats);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Storage API ---
 
 // Batch Migration

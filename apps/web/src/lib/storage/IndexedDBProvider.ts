@@ -225,4 +225,17 @@ export class IndexedDBProvider implements Storage {
   async sync(): Promise<void> {
     return Promise.resolve();
   }
+
+  async getLocalStats() {
+    const [trackCount, historyCount, favoriteCount] = await Promise.all([
+      this.db.tracks.count(),
+      this.db.history.count(),
+      this.db.favoriteGroups.count(),
+    ]);
+    return {
+      tracks: trackCount,
+      history: historyCount,
+      favorites: favoriteCount
+    };
+  }
 }

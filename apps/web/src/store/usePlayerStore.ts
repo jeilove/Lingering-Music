@@ -47,6 +47,7 @@ interface PlayerState {
   setCurrentTime: (time: number) => void;
   restoreFromBackup: (data: any) => Promise<void>;
   forceSync: () => Promise<void>;
+  getStorageStats: () => Promise<{ local: any, remote: any }>;
 }
 
 const storage = new BackendStorageProvider();
@@ -452,6 +453,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
     isInitialized = false;
     await initStorage({ setState: set, getState: get });
+  },
+
+  getStorageStats: async () => {
+    const local = await oldLocalStorage.getLocalStats();
+    const remote = await storage.getGlobalStats();
+    return { local, remote };
   },
 
   restoreFromBackup: async (data) => {

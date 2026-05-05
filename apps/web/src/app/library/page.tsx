@@ -66,19 +66,98 @@ export default function LibraryPage() {
         </div>
       </div>
 
-      {/* Debug Info (Only for troubleshooting) */}
-      <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">System Status</span>
-          <span className="text-xs font-mono text-white/40">Active User ID: {usePlayerStore.getState().userId || 'Guest (Local Only)'}</span>
+      {/* Diagnostic Center */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Data Diagnostic Center
+          </h3>
+          <button 
+            onClick={async () => {
+              const stats = await usePlayerStore.getState().getStorageStats();
+              (window as any)._lastStats = stats;
+              usePlayerStore.getState().forceSync();
+            }}
+            className="text-[10px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full border border-white/5 transition-all"
+          >
+            Run Full Diagnostics
+          </button>
         </div>
-        <button 
-          onClick={() => usePlayerStore.getState().forceSync()}
-          className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-white transition-colors"
-        >
-          Force Sync
-        </button>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Local Storage Stats */}
+          <div className="glass-card p-6 rounded-[32px] bg-white/[0.02] border border-white/5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Local Browser Storage</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest">IndexedDB (Offline)</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">Tracks</span>
+                <span className="text-xl font-black text-white" id="local-tracks">-</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">History</span>
+                <span className="text-xl font-black text-white" id="local-history">-</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">Groups</span>
+                <span className="text-xl font-black text-white" id="local-favorites">-</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Remote DB Stats */}
+          <div className="glass-card p-6 rounded-[32px] bg-primary/5 border border-primary/10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                <Navigation className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Online Cloud DB</p>
+                <p className="text-[10px] text-primary/60 uppercase tracking-widest">Neon PostgreSQL (Cloud)</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col">
+                <span className="text-xs text-primary/40">Total Tracks</span>
+                <span className="text-xl font-black text-white" id="remote-tracks">-</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-primary/40">Total History</span>
+                <span className="text-xl font-black text-white" id="remote-history">-</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-primary/40">Total Groups</span>
+                <span className="text-xl font-black text-white" id="remote-favorites">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <script dangerouslySetInnerHTML={{ __html: `
+          setInterval(() => {
+            const stats = window._lastStats;
+            if (stats) {
+              if (stats.local) {
+                document.getElementById('local-tracks').innerText = stats.local.tracks || 0;
+                document.getElementById('local-history').innerText = stats.local.history || 0;
+                document.getElementById('local-favorites').innerText = stats.local.favorites || 0;
+              }
+              if (stats.remote) {
+                document.getElementById('remote-tracks').innerText = stats.remote.tracks || 0;
+                document.getElementById('remote-history').innerText = stats.remote.history || 0;
+                document.getElementById('remote-favorites').innerText = stats.remote.favorites || 0;
+              }
+            }
+          }, 1000);
+        `}} />
       </div>
 
       {/* Header */}
