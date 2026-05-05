@@ -204,10 +204,34 @@ class NeonDB {
         }
       });
 
-      // 1. Tracks (Global)
-      const CHUNK_SIZE = 20;
-      for (let i = 0; i < tracks.length; i += CHUNK_SIZE) {
-        const chunk = tracks.slice(i, i + CHUNK_SIZE);
+      // 1. COLLECT ALL UNIQUE TRACKS (From tracks list + history + favorites)
+      // This prevents parallel upsert race conditions
+      const uniqueTracks = new Map<string, any>();
+      
+      // Initial tracks
+      tracks.forEach(t => {
+        if (t.id) uniqueTracks.set(t.id, t);
+      });
+
+      // From favorites
+      favorites.forEach(g => {
+        g.tracks?.forEach(t => {
+          if (t.id) uniqueTracks.set(t.id, t);
+        });
+      });
+
+      // From history (minimal info)
+      history.forEach((h: any) => {
+        const tid = h.trackId || h.id || h.songId;
+        if (tid && !uniqueTracks.has(tid)) {
+          uniqueTracks.set(tid, { id: tid, title: 'Recovered Track', artist: 'Unknown' });
+        }
+      });
+
+      console.log(`[NeonDB] Saving ${uniqueTracks.size} unique tracks...`);
+      const trackArray = Array.from(uniqueTracks.values());
+      for (let i = 0; i < trackArray.length; i += CHUNK_SIZE) {
+        const chunk = trackArray.slice(i, i + CHUNK_SIZE);
         await Promise.all(chunk.map(async (t) => {
           try {
             await this.saveTrack(t);
@@ -227,30 +251,21 @@ class NeonDB {
       }
 
       for (const chunk of historyChunks) {
-        await Promise.all(chunk.map(async (h: any) => {
+        // Use sequential or smaller batches for history to avoid locks
+        for (const h of chunk) {
           try {
             const trackId = h.trackId || h.id || h.songId;
             if (!trackId) {
               stats.history.fail++;
-              return;
+              continue;
             }
 
             const rawDate = h.playedAt || h.timestamp || h.played_at || new Date();
             const date = new Date(rawDate);
             if (isNaN(date.getTime())) {
               stats.history.fail++;
-              return;
+              continue;
             }
-
-            await prisma.track.upsert({
-              where: { id: trackId },
-              update: {},
-              create: { 
-                id: trackId,
-                title: h.title || 'Recovered Track',
-                artist: h.artist || 'Unknown'
-              }
-            });
 
             await prisma.history.create({
               data: {
@@ -262,8 +277,9 @@ class NeonDB {
             stats.history.success++;
           } catch (e: any) {
             stats.history.fail++;
+            console.error(`[NeonDB] History item fail for user ${userId}: ${e.message}`);
           }
-        }));
+        }
       }
 
       // 3. Favorites (User specific)
