@@ -205,22 +205,19 @@ class NeonDB {
       });
 
       // 1. COLLECT ALL UNIQUE TRACKS (From tracks list + history + favorites)
-      // This prevents parallel upsert race conditions
       const uniqueTracks = new Map<string, any>();
+      const CHUNK_SIZE = 20; // Explicitly define here
       
-      // Initial tracks
       tracks.forEach(t => {
         if (t.id) uniqueTracks.set(t.id, t);
       });
 
-      // From favorites
       favorites.forEach(g => {
         g.tracks?.forEach(t => {
           if (t.id) uniqueTracks.set(t.id, t);
         });
       });
 
-      // From history (minimal info)
       history.forEach((h: any) => {
         const tid = h.trackId || h.id || h.songId;
         if (tid && !uniqueTracks.has(tid)) {
@@ -251,8 +248,8 @@ class NeonDB {
       }
 
       for (const chunk of historyChunks) {
-        // Use sequential or smaller batches for history to avoid locks
-        for (const h of chunk) {
+        for (const hRaw of chunk) {
+          const h = hRaw as any; // Cast to any for flexible property access
           try {
             const trackId = h.trackId || h.id || h.songId;
             if (!trackId) {
