@@ -104,10 +104,30 @@ export default function LibraryPage() {
               "text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full border transition-all active:scale-95",
               isDiagnosing 
                 ? "bg-white/10 border-white/10 text-white/40 cursor-wait" 
+                : "bg-white/5 text-white border-white/10 hover:bg-white/10"
+            )}
+          >
+            {isDiagnosing ? "Analyzing..." : "Refresh Stats"}
+          </button>
+          
+          <button 
+            disabled={isDiagnosing}
+            onClick={async () => {
+              setIsDiagnosing(true);
+              await usePlayerStore.getState().adoptAnonymousData();
+              const stats = await usePlayerStore.getState().getStorageStats();
+              setDiagStats(stats);
+              setIsDiagnosing(false);
+              alert('데이터 복구 시도가 완료되었습니다. 재생 목록을 확인해 보세요!');
+            }}
+            className={cn(
+              "text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full border transition-all active:scale-95",
+              isDiagnosing 
+                ? "bg-white/10 border-white/10 text-white/40 cursor-wait" 
                 : "bg-primary text-white border-primary shadow-lg shadow-primary/20 hover:bg-primary/80"
             )}
           >
-            {isDiagnosing ? "Running Analysis..." : "Run Full Diagnostics"}
+            {isDiagnosing ? "Recovering..." : "Recover & Adopt My Data"}
           </button>
         </div>
         

@@ -226,11 +226,27 @@ export class BackendStorageProvider implements Storage {
 
   async getGlobalStats(): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/storage/debug-stats`);
+      const res = await fetch(`${API_BASE_URL}/storage/debug-stats`, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
       console.error('[StorageProvider] getGlobalStats failed:', e);
+      return null;
+    }
+  }
+
+  async adoptAnonymousData(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/storage/adopt-anonymous`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error('[StorageProvider] adoptAnonymousData failed:', e);
       return null;
     }
   }

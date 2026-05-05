@@ -48,6 +48,7 @@ interface PlayerState {
   restoreFromBackup: (data: any) => Promise<void>;
   forceSync: () => Promise<void>;
   getStorageStats: () => Promise<{ local: any, remote: any }>;
+  adoptAnonymousData: () => Promise<void>;
 }
 
 const storage = new BackendStorageProvider();
@@ -459,6 +460,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const local = await oldLocalStorage.getLocalStats();
     const remote = await storage.getGlobalStats();
     return { local, remote };
+  },
+
+  adoptAnonymousData: async () => {
+    console.log('[PlayerStore] Adopting anonymous data...');
+    await storage.adoptAnonymousData();
+    await get().forceSync();
   },
 
   restoreFromBackup: async (data) => {

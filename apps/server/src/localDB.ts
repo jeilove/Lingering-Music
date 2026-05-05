@@ -323,6 +323,34 @@ class NeonDB {
       throw error;
     }
   }
+
+  async adoptAnonymousData(newUserId: string) {
+    try {
+      console.log(`[NeonDB] Adopting anonymous data for user: ${newUserId}`);
+      
+      // 1. History
+      const historyUpdate = await prisma.history.updateMany({
+        where: { userId: 'anonymous' },
+        data: { userId: newUserId }
+      });
+      
+      // 2. Favorite Groups
+      const favoritesUpdate = await prisma.favoriteGroup.updateMany({
+        where: { userId: 'anonymous' },
+        data: { userId: newUserId }
+      });
+
+      console.log(`[NeonDB] Adoption complete. History: ${historyUpdate.count}, Groups: ${favoritesUpdate.count}`);
+
+      return {
+        historyAdopted: historyUpdate.count,
+        favoritesAdopted: favoritesUpdate.count
+      };
+    } catch (error) {
+      console.error('[NeonDB] adoptAnonymousData error:', error);
+      throw error;
+    }
+  }
 }
 
 export const localDB = new NeonDB();

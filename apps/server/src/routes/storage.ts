@@ -26,6 +26,20 @@ router.get('/storage/debug-stats', async (req, res) => {
   }
 });
 
+// Adopt anonymous data to current user
+router.post('/storage/adopt-anonymous', async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId || userId === 'anonymous') {
+      return res.status(400).json({ error: 'Must be logged in to adopt data' });
+    }
+    const result = await localDB.adoptAnonymousData(userId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Storage API ---
 
 // Batch Migration
