@@ -18,6 +18,7 @@ interface PlayerState {
   selectedGroupId: string | null;
   isLyricsOpen: boolean;
   currentTime: number;
+  userId: string | null;
   
   // Actions
   setUserId: (userId: string | null) => Promise<void>;
@@ -149,6 +150,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   selectedGroupId: null,
   isLyricsOpen: false,
   currentTime: 0,
+  userId: null,
 
   setUserId: async (userId) => {
     // Treat undefined/empty as null for consistency
@@ -159,6 +161,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     console.log('[PlayerStore] User ID transition:', currentUserId, '->', normalizedId);
     currentUserId = normalizedId;
     storage.setUserId(normalizedId);
+    set({ userId: normalizedId });
     
     // Hard reset initialization state to force clean reload
     isInitialized = false;

@@ -71,7 +71,7 @@ export default function LibraryPage() {
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">System Status</span>
-          <span className="text-xs font-mono text-white/40">Active User ID: {usePlayerStore.getState().getUserId ? "Loading..." : (typeof window !== 'undefined' ? (window as any).currentUserId || 'Checking...' : 'Server')}</span>
+          <span className="text-xs font-mono text-white/40">Active User ID: {usePlayerStore.getState().userId || 'Guest (Local Only)'}</span>
         </div>
         <button 
           onClick={() => window.location.reload()}
